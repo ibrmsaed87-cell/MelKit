@@ -75,6 +75,15 @@
 - الوصول غير المتاح يظهر رسالة مفهومة وخطوة إصلاح. مسار Shizuku يُختبر قبل اعتماده، مع دليل عربي وإنجليزي عند الحاجة.
 - شاشة الاقتران والكاميرا لا تفرض الوضع الأفقي. بدء نقل جديد يمسح حالة الجلسة السابقة.
 
+### بطاقة شرح Shizuku
+
+- نضيف بطاقة واضحة بعنوان **شرح إعداد Shizuku** داخل قسم الأدوات، على غرار دليل تطبيق Minecraft Backup الذي أشار إليه المستخدم باسم MMBK.
+- تعرض البطاقة فيديو عربيًا عندما تكون لغة MelKit عربية، وفيديو إنجليزيًا عند اختيار الإنجليزية، بتنسيق منسجم مع بقية الواجهة.
+- يوضح الشرح الإعداد لأول مرة: فتح Shizuku، إعداد التصحيح اللاسلكي والاقتران، إدخال رمز الاقتران في إشعار Shizuku، ثم بدء الخدمة ومنح MelKit الإذن.
+- يبدأ الفيديو بالتنويه إلى أن الإعداد والاقتران خطوات أول تشغيل؛ في الاستخدام المعتاد لاحقًا يكفي فتح Shizuku وبدء الخدمة، مع توضيح ما يلزم إن طلب النظام إعادة الاقتران.
+- تتضمن البطاقة رابط تنزيل Shizuku الرسمي. وتوفر رسالة «يجب تشغيل Shizuku أولًا» اختصارًا لفتح بطاقة الشرح.
+- معيار القبول: ظهور الفيديو المناسب للغة، وضوح الاقتران والإشعار، وإمكانية الوصول إلى الشرح من الأدوات ورسالة الحاجة إلى Shizuku. هذه ميزة مخططة ولم تُنفذ داخل التطبيق بعد.
+
 ### تبويب المزيد من التطبيقات — أربع بطاقات بالضبط
 
 | البطاقة | الغرض | الرابط |
@@ -92,7 +101,7 @@
 | --- | --- | --- |
 | P0 — تأسيس المشروع | README أولًا، GitHub وGitLab، CI، الأسرار، المفتاح الثابت، هيكل Android وأول APK | بناء GitLab ناجح وبصمة شهادة مسجلة، ثم إصدار ثانٍ بتثبيت فوق الأول دون إزالة التطبيق |
 | P1 — إثبات الوصول | قراءة مود وخريطة وحفظ فعلي، إخراجها، استعادتها، تجربة Shizuku على Android 16، وفحص العوالم | فتح الملفات المستعادة في اللعبة؛ توثيق المسارات والصيغ التي اختُبرت فقط |
-| P2 — الواجهة والمكتبة | تنفيذ التصميم، العربية والإنجليزية، حالات الواجهة، تبويب التطبيقات الأربع | مراجعة الاتجاهين على المحاكي والهاتف دون قص أو بيانات مضللة |
+| P2 — الواجهة والمكتبة | تنفيذ التصميم، العربية والإنجليزية، حالات الواجهة، تبويب التطبيقات الأربع، وبطاقة شرح Shizuku باللغتين | مراجعة الاتجاهين على المحاكي والهاتف دون قص أو بيانات مضللة، والتحقق من فيديو الشرح المناسب للغة |
 | P3 — الحماية | النسخ والاستعادة، التعارضات، التحقق، الخزنة وسجل العمليات | نسخة فعلية قابلة للاستعادة وتجارب نقص المساحة وانقطاع العملية |
 | P4 — التحكم | التفعيل والتعطيل، المجموعات، تثبيت المودات الأساسية، التراجع | تبديل مجموعة وتشغيل اللعبة ثم الرجوع للحالة السابقة |
 | P5 — الفاحص | الفارغ والمكرر والتحقق المدعوم والعزل | نتائج واضحة لعينة سليمة وفارغة ومكررة وغير مدعومة وخطأ وصول |
@@ -169,6 +178,7 @@
 - [ ] اختبارات محاكي أولًا ثم تأكيد على الهاتف، واختبار المشاركة على هاتفين.
 - [ ] العربية والإنجليزية وRTL/LTR والأحجام والتواريخ صحيحة.
 - [ ] تبويب المزيد من التطبيقات يحوي أربع بطاقات وروابط فعلية.
+- [ ] بطاقة شرح Shizuku تعرض فيديو اللغة المناسبة وخطوات أول إعداد والتشغيل اللاحق، مع اختصار من رسالة الحاجة إلى Shizuku.
 - [ ] المفتاح والبكج ثابتان والتحديث يثبت فوق النسخة السابقة.
 - [ ] الخزنة والنسخ تبقى بعد إزالة التطبيق؛ الاستعادة والعزل والتراجع مختبرة.
 - [ ] الإعلانات وUMP وFCM وملف Google Services مختبرة.
@@ -179,7 +189,7 @@
 
 MelKit (`com.spinel.melkit`) is an Arabic/English Android content manager for Melon Sandbox. It manages existing user content: backup/restore, offline phone-to-phone transfer, exportable bundles, a searchable library, safe mod toggling, activation profiles, duplicate/empty-file checks, supported-format validation, reversible quarantine, local categories, thumbnail preparation, and an operation history.
 
-MMIX remains the general downloaded-file installer. In-game category/name and thumbnail changes are experimental until the current formats are verified with real files. No FPS or universal crash-fix promises are made.
+MMIX remains the general downloaded-file installer. A dedicated Shizuku guide card in Tools will show an Arabic or English video matching the app language, cover first-time pairing and subsequent starts, link to the official download, and be accessible from Shizuku-required messages. In-game category/name and thumbnail changes are experimental until the current formats are verified with real files. No FPS or universal crash-fix promises are made.
 
 GitHub is the source of truth and runs only a short sync workflow. GitLab builds signed release APKs. README must be the first committed file. A permanent signing key must be created once, saved before distribution, and reused for every install-over update. AdMob/UMP and Firebase/FCM with validated Play Store links are late release-preparation work.
 
