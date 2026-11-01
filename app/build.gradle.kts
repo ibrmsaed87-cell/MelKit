@@ -18,7 +18,8 @@ android {
 
     defaultConfig {
         applicationId = "com.spinel.melkit"
-        minSdk = 23
+        // The published Shizuku API 13.1.5 AAR requires API 24.
+        minSdk = 24
         targetSdk = 36
         versionCode = configuredVersionCode
         versionName = "0.1.1"
