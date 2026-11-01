@@ -65,6 +65,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -83,8 +84,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
 import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spinel.melkit.BuildConfig
 import com.spinel.melkit.R
+import com.spinel.melkit.storage.GameLibraryViewModel
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
 private data class Feature(val route: String, val title: Int, val description: Int, val icon: ImageVector)
@@ -110,6 +113,8 @@ private val features = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MelKitApp() {
+    val libraryModel: GameLibraryViewModel = viewModel()
+    val libraryState by libraryModel.state.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -166,24 +171,27 @@ fun MelKitApp() {
     ) { insets ->
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             key(route) {
-                Column(
-                    Modifier.widthIn(max = 680.dp).fillMaxWidth()
-                        .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    when (route) {
-                        "home" -> HomeScreen(navigate)
-                        "library" -> PlannedScreen(R.string.library_empty, R.string.library_description, Icons.Outlined.Folder)
-                        "backups" -> PlannedScreen(R.string.backups_empty, R.string.backups_description, Icons.Outlined.Archive)
-                        "share" -> ShareScreen(navigate)
-                        "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
-                        "settings" -> SettingsScreen()
-                        "shizuku" -> ShizukuScreen()
-                        else -> features.find { it.route == route }?.let {
-                            PlannedScreen(it.title, it.description, it.icon)
+                if (route == "library") {
+                    LibraryScreen(libraryState, libraryModel) { navigate("shizuku") }
+                } else {
+                    Column(
+                        Modifier.widthIn(max = 680.dp).fillMaxWidth()
+                            .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        when (route) {
+                            "home" -> HomeScreen(navigate, libraryState.connected)
+                            "backups" -> PlannedScreen(R.string.backups_empty, R.string.backups_description, Icons.Outlined.Archive)
+                            "share" -> ShareScreen(navigate)
+                            "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
+                            "settings" -> SettingsScreen()
+                            "shizuku" -> ShizukuScreen()
+                            else -> features.find { it.route == route }?.let {
+                                PlannedScreen(it.title, it.description, it.icon)
+                            }
                         }
+                        Spacer(Modifier.height(8.dp))
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
             }
         }
@@ -191,7 +199,7 @@ fun MelKitApp() {
 }
 
 @Composable
-private fun HomeScreen(navigate: (String) -> Unit) {
+private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.dashboard), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         MutedText(R.string.tagline)
@@ -204,7 +212,10 @@ private fun HomeScreen(navigate: (String) -> Unit) {
                 LibraryStat(R.string.maps, Icons.Outlined.Map)
                 LibraryStat(R.string.saves, Icons.Outlined.Save)
             }
-            MutedText(R.string.not_connected)
+            MutedText(if (connected) R.string.library_connected else R.string.not_connected)
+            FilledTonalButton(onClick = { navigate("library") }) {
+                Text(stringResource(R.string.library_browse))
+            }
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
