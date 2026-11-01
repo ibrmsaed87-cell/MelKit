@@ -1,0 +1,31 @@
+name: Sync MelKit to GitLab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: melkit-gitlab-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: ${{ vars.GITLAB_REPOSITORY_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Push main to GitLab without building Android
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_REPOSITORY_URL: ${{ vars.GITLAB_REPOSITORY_URL }}
+        run: bash ci/sync-gitlab.sh

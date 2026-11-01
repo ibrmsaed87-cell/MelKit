@@ -1,0 +1,33 @@
+# Build outputs and local IDE configuration
+.gradle/
+**/build/
+.idea/
+local.properties
+*.iml
+.android-sdk/
+
+# Credentials and signing material: preserve safely outside Git history.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.env
+.env*
+!.env.example
+keystore.properties
+signing.properties
+google-services.json
+*secrets*.json
+*service-account*.json
+
+# Temporary transfer and signing data
+.ci-signing/
+*.apk
+*.aab
+*.apks
+*.idsig
+*.log
+__pycache__/
+.DS_Store

@@ -1,0 +1,55 @@
+stages:
+  - validate
+  - build
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+default:
+  interruptible: true
+
+variables:
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  ANDROID_SDK_ROOT: "$CI_PROJECT_DIR/.android-sdk"
+  ANDROID_COMPILE_SDK: "36"
+  ANDROID_BUILD_TOOLS: "36.0.0"
+  ANDROID_COMMAND_LINE_TOOLS: "11076708"
+  BUILD_AAB: "false"
+  MELKIT_VERSION_CODE_BASE: "0"
+
+validate_foundation:
+  stage: validate
+  image: bash:5.2
+  script:
+    - test -s README.md
+    - test -s .github/workflows/sync-gitlab.yml
+    - bash -n ci/sync-gitlab.sh
+    - bash -n ci/build-android.sh
+
+build_signed_apk:
+  stage: build
+  image: gradle:8.14.3-jdk17
+  timeout: 30m
+  rules:
+    # This phase starts only after the Android project exists.
+    # The script also requires and validates its Gradle Wrapper.
+    - exists:
+        - app/build.gradle.kts
+  cache:
+    key: "melkit-android36-gradle8-v1"
+    paths:
+      - .gradle/caches/
+      - .gradle/wrapper/
+      - .android-sdk/
+  script:
+    - bash ci/build-android.sh
+  artifacts:
+    name: "MelKit-${CI_PIPELINE_IID}-${CI_COMMIT_SHORT_SHA}"
+    when: on_success
+    paths:
+      - app/build/outputs/apk/release/*.apk
+      - app/build/outputs/bundle/release/*.aab
+      - build/reports/melkit-build.txt
+    expire_in: 7 days
