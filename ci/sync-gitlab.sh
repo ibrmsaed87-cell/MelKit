@@ -2,7 +2,7 @@
 set -euo pipefail
 
 : "${GITLAB_TOKEN:?Add the GITLAB_TOKEN GitHub Actions secret.}"
-: "${GITLAB_REPOSITORY_URL:?Add the GITLAB_REPOSITORY_URL GitHub Actions variable.}"
+export GITLAB_REPOSITORY_URL="${GITLAB_REPOSITORY_URL:-https://gitlab.com/spinel-group/melkit.git}"
 
 # A clean GitLab HTTPS destination; never embed credentials in a remote URL.
 if [[ ! "$GITLAB_REPOSITORY_URL" =~ ^https://gitlab\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+\.git$ ]]; then

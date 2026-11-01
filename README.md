@@ -11,6 +11,7 @@
 | اللغات | العربية RTL والإنجليزية LTR، مع اختيار اللغة من الإعدادات |
 | المظهر | داكن افتراضيًا، بطاقات واضحة ولمسات خضراء وفق التصميم المعتمد |
 | مصدر الكود الرئيسي | https://github.com/ibrmsaed87-cell/MelKit |
+| مستودع GitLab | https://gitlab.com/spinel-group/melkit |
 | جهة البناء | GitLab CI؛ GitHub يقوم بالمزامنة فقط |
 | الحزمة الأولى على الهاتف | APK بإصدار Release ومفتاح التوقيع الثابت |
 
@@ -20,12 +21,14 @@
 
 - [x] اعتماد اسم MelKit والبكج وتصوّر الشاشة الرئيسية.
 - [x] اعتماد نطاق الخدمات واللغتين وتبويب المزيد من التطبيقات.
-- [x] إعداد README وملفات CI محليًا؛ لم تُشغّل على الخوادم بعد.
+- [x] رفع README وملفات التأسيس وCI إلى GitHub؛ بناء Android لم يبدأ بعد.
 - [x] فحص YAML وصياغة Bash محليًا، والتحقق من رفض البناء عند غياب أسرار التوقيع.
 - [x] إنشاء مستودع GitHub: `ibrmsaed87-cell/MelKit`، فرع `main`.
 - [x] رفع README كأول ملف وأول commit: [`f0d7ddc`](https://github.com/ibrmsaed87-cell/MelKit/commit/f0d7ddc89b8fc81b5729e70a5bd425af6574f1b8).
-- [x] تجهيز ملفات التأسيس لرفعها في commit لاحق مستقل عن README الأول.
-- [ ] إنشاء مستودع GitLab وربط المزامنة وتأكيد وصول commit مطابق.
+- [x] رفع ملفات التأسيس في commit لاحق مستقل عن README الأول.
+- [x] استلام رابط مستودع GitLab الذي أنشأه المستخدم: https://gitlab.com/spinel-group/melkit.
+- [x] ضبط الوجهة الافتراضية للمزامنة على `https://gitlab.com/spinel-group/melkit.git`.
+- [ ] إضافة `GITLAB_TOKEN` إلى أسرار مستودع GitHub، وتشغيل المزامنة وتأكيد وصول commit مطابق.
 - [ ] إنشاء مفتاح MelKit مرة واحدة وحفظه بأمان قبل أول APK.
 - [ ] بناء هيكل Android وإخراج أول APK موقّع.
 - [ ] اختبار استخراج ملفات فعلية من اللعبة واستعادتها على Android 16.
@@ -119,9 +122,9 @@
 
 1. ننشئ مستودع GitHub، ثم نرفع **README.md وحده كأول commit**.
 2. نرفع ملفات التأسيس والربط في commit لاحق. الفرع الرئيسي هو `main`.
-3. ننشئ مستودع GitLab فارغًا؛ GitHub هو مصدر التغييرات، ولا نحرر الكود في النسخة المرآة.
+3. أنشأ المستخدم مستودع GitLab: https://gitlab.com/spinel-group/melkit. GitHub هو مصدر التغييرات، ولا نحرر الكود في النسخة المرآة.
 4. ملف `.github/workflows/sync-gitlab.yml` يقوم بدفع `main` فقط إلى GitLab، دون بناء Android ودون نسخ APK إلى GitHub. لا يستخدم `--mirror` أو دفعًا قسريًا يحذف عملًا آخر.
-   تنتظر مهمة المزامنة ضبط المتغير `GITLAB_REPOSITORY_URL`؛ بعد ضبطه وإضافة السر يُشغّل workflow يدويًا لأول مزامنة.
+   الوجهة الافتراضية مضبوطة في السكربت. تفحص المهمة وجود `GITLAB_TOKEN`؛ إذا غاب تعرض تنويهًا بأن المزامنة معلقة وتتخطى الرفع. بعد إضافة السر يُشغّل workflow يدويًا لأول مزامنة. نجاح فحص الإعداد وحده لا يعني وصول الملفات إلى GitLab.
 5. ملف `.gitlab-ci.yml` ينفذ فحص التأسيس الخفيف. بناء Android لا يُضاف إلى pipeline قبل وجود ملف التطبيق وGradle Wrapper.
 6. GitLab يبني APK Release بالمفتاح الأصلي؛ يكون تنزيل التجربة من Artifacts. الاحتفاظ الافتراضي 7 أيام مع ضبط احتفاظ آخر pipeline ناجح لتقليل التخزين.
 7. AAB يضاف عند طلب بناء النشر عبر `BUILD_AAB=true`؛ لا نبني AAB في كل تجربة.
@@ -132,9 +135,9 @@
 | النوع | الاسم | الاستخدام |
 | --- | --- | --- |
 | Actions secret | `GITLAB_TOKEN` | اعتماد دفع مخصص للمستودع المقصود فقط؛ لا يوضع في عنوان remote أو السجلات |
-| Actions variable | `GITLAB_REPOSITORY_URL` | رابط HTTPS الفعلي للمستودع المناظر في GitLab، دون اسم مستخدم أو رمز وصول |
+| Actions variable اختياري | `GITLAB_REPOSITORY_URL` | تجاوز الوجهة الافتراضية عند الحاجة؛ لا يلزم إضافته للمستودع الحالي |
 
-لا نضع عنوان GitLab مخمّنًا في التنفيذ؛ بعد إنشاء المشروع يُنسخ الرابط الصحيح إلى المتغير. لا نبني Android داخل GitHub Actions.
+الوجهة الافتراضية هي الرابط الذي أرسله المستخدم: `https://gitlab.com/spinel-group/melkit.git`. لإكمال الربط، يضيف المستخدم رمز GitLab الذي يستطيع الدفع إلى هذا المشروع باسم `GITLAB_TOKEN` من GitHub → Settings → Secrets and variables → Actions → New repository secret، ثم يُشغّل workflow. لا يُرسل الرمز في الدردشة ولا يوضع في الكود. لا نبني Android داخل GitHub Actions.
 
 ### أسرار MelKit — نفس القيم في GitHub وGitLab
 
@@ -202,4 +205,4 @@ GitHub is the source of truth and runs only a short sync workflow. GitLab builds
 
 ---
 
-آخر تحديث للخطة: **1 نوفمبر 2026**. حالة المشروع: **مستودع GitHub منشأ وREADME الأول منشور؛ إعداد GitLab والأسرار وهيكل Android وأول APK ما زال مطلوبًا**.
+آخر تحديث للخطة: **1 نوفمبر 2026**. حالة المشروع: **ملفات التأسيس منشورة في GitHub ووجهة GitLab مضبوطة؛ تأكيد سر المزامنة ووصول الملفات، وأسرار التوقيع وهيكل Android وأول APK ما زالت مطلوبة**.
