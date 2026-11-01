@@ -1,5 +1,6 @@
 # Build outputs and local IDE configuration
 .gradle/
+.kotlin/
 **/build/
 .idea/
 local.properties
