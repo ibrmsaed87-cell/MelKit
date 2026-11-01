@@ -28,7 +28,7 @@
 - [x] رفع ملفات التأسيس في commit لاحق مستقل عن README الأول.
 - [x] استلام رابط مستودع GitLab الذي أنشأه المستخدم: https://gitlab.com/spinel-group/melkit.
 - [x] ضبط الوجهة الافتراضية للمزامنة على `https://gitlab.com/spinel-group/melkit.git`.
-- [ ] إضافة `GITLAB_TOKEN` إلى أسرار مستودع GitHub، وتشغيل المزامنة وتأكيد وصول commit مطابق.
+- [x] إضافة `GITLAB_TOKEN` وتشغيل المزامنة بنجاح: وصل `main` إلى GitLab عند commit `43d025d`؛ [سجل التشغيل](https://github.com/ibrmsaed87-cell/MelKit/actions/runs/41349713667) يؤكد نجاح خطوة الدفع.
 - [ ] إنشاء مفتاح MelKit مرة واحدة وحفظه بأمان قبل أول APK.
 - [ ] بناء هيكل Android وإخراج أول APK موقّع.
 - [ ] اختبار استخراج ملفات فعلية من اللعبة واستعادتها على Android 16.
@@ -205,4 +205,4 @@ GitHub is the source of truth and runs only a short sync workflow. GitLab builds
 
 ---
 
-آخر تحديث للخطة: **1 نوفمبر 2026**. حالة المشروع: **ملفات التأسيس منشورة في GitHub ووجهة GitLab مضبوطة؛ تأكيد سر المزامنة ووصول الملفات، وأسرار التوقيع وهيكل Android وأول APK ما زالت مطلوبة**.
+آخر تحديث للخطة: **1 نوفمبر 2026**. حالة المشروع: **ملفات التأسيس منشورة، ومزامنة GitHub إلى GitLab نجحت؛ إنشاء مفتاح التوقيع وحفظ أسراره، وهيكل Android وأول APK ما زالت مطلوبة. لم يُتحقق من نتيجة pipeline داخل GitLab بعد**.
