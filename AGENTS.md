@@ -17,6 +17,10 @@ acceptance criteria, and progress record. Update it when a phase or decision cha
   in GitLab CI. Do not add GitHub APK/AAB build jobs.
 - Use the permanent MelKit signing key from the first distributed APK. Never regenerate
   or replace it to fix CI. Missing or mismatched signing secrets must stop the build.
+- The original key has already been created. Recover it from the private
+  MelKit-signing-backup.zip deliverable if needed; never create another key.
+  MELKIT_SIGNING_BUNDLE is the preferred single CI secret. The public fingerprint
+  in docs/signing-certificate.sha256 must match the key and every release APK.
 - Never commit credentials or signing keys, expose them in logs, or put them in artifacts.
 - Add AdMob/UMP and Firebase/FCM during the late release-preparation phase.
 - Do not claim a feature, build, phone test, remote repository, or secret setup is done

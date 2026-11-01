@@ -2,7 +2,28 @@
 set -euo pipefail
 
 # Fail closed: this script never generates or substitutes signing keys.
-for melkit_name in MELKIT_KEYSTORE_BASE64 MELKIT_STORE_PASSWORD MELKIT_KEY_ALIAS MELKIT_KEY_PASSWORD MELKIT_SIGNING_CERT_SHA256; do
+umask 077
+melkit_signing_dir="$(mktemp -d)"
+trap 'rm -rf "$melkit_signing_dir"' EXIT
+export MELKIT_KEYSTORE_PATH="$melkit_signing_dir/melkit-release.jks"
+
+if [[ -n "${MELKIT_SIGNING_BUNDLE:-}" ]]; then
+  printf '%s' "$MELKIT_SIGNING_BUNDLE" | base64 --decode > "$melkit_signing_dir/bundle.tar.gz"
+  unset MELKIT_SIGNING_BUNDLE
+  # Extract fixed members to stdout only. Never extract paths from the archive.
+  tar -xOzf "$melkit_signing_dir/bundle.tar.gz" melkit-release.jks > "$MELKIT_KEYSTORE_PATH"
+  export MELKIT_STORE_PASSWORD="$(tar -xOzf "$melkit_signing_dir/bundle.tar.gz" store-password)"
+  export MELKIT_KEY_PASSWORD="$(tar -xOzf "$melkit_signing_dir/bundle.tar.gz" key-password)"
+  export MELKIT_KEY_ALIAS="$(tar -xOzf "$melkit_signing_dir/bundle.tar.gz" key-alias)"
+  melkit_package="$(tar -xOzf "$melkit_signing_dir/bundle.tar.gz" package-name)"
+  [[ "$melkit_package" == com.spinel.melkit ]] || { printf '%s\n' 'Signing bundle belongs to another application.' >&2; exit 1; }
+else
+  : "${MELKIT_KEYSTORE_BASE64:?Add MELKIT_SIGNING_BUNDLE or the original individual signing variables.}"
+  printf '%s' "$MELKIT_KEYSTORE_BASE64" | base64 --decode > "$MELKIT_KEYSTORE_PATH"
+  unset MELKIT_KEYSTORE_BASE64
+fi
+
+for melkit_name in MELKIT_STORE_PASSWORD MELKIT_KEY_ALIAS MELKIT_KEY_PASSWORD; do
   if [[ -z "${!melkit_name:-}" ]]; then
     printf 'Missing required signing variable: %s\n' "$melkit_name" >&2
     exit 1
@@ -14,19 +35,12 @@ if [[ ! -f app/build.gradle.kts || ! -f gradlew || ! -f gradle/wrapper/gradle-wr
   exit 1
 fi
 
-melkit_expected="${MELKIT_SIGNING_CERT_SHA256//:/}"
+melkit_expected="$(tr -d '\r\n:' < docs/signing-certificate.sha256)"
 melkit_expected="${melkit_expected,,}"
 if [[ ! "$melkit_expected" =~ ^[a-f0-9]{64}$ ]]; then
-  printf '%s\n' 'MELKIT_SIGNING_CERT_SHA256 must contain the original certificate SHA-256 fingerprint.' >&2
+  printf '%s\n' 'docs/signing-certificate.sha256 must contain the original certificate fingerprint.' >&2
   exit 1
 fi
-
-umask 077
-melkit_signing_dir="$(mktemp -d)"
-trap 'rm -rf "$melkit_signing_dir"' EXIT
-export MELKIT_KEYSTORE_PATH="$melkit_signing_dir/melkit-release.jks"
-printf '%s' "$MELKIT_KEYSTORE_BASE64" | base64 --decode > "$MELKIT_KEYSTORE_PATH"
-unset MELKIT_KEYSTORE_BASE64
 
 keytool -exportcert -keystore "$MELKIT_KEYSTORE_PATH" \
   -alias "$MELKIT_KEY_ALIAS" -storepass:env MELKIT_STORE_PASSWORD \
@@ -40,9 +54,6 @@ fi
 : "${CI_PROJECT_DIR:?Run in GitLab CI or explicitly provide CI_PROJECT_DIR.}"
 : "${CI_PIPELINE_IID:?A monotonically increasing pipeline number is required.}"
 : "${ANDROID_SDK_ROOT:?Set ANDROID_SDK_ROOT.}"
-: "${ANDROID_COMPILE_SDK:?Set ANDROID_COMPILE_SDK.}"
-: "${ANDROID_BUILD_TOOLS:?Set ANDROID_BUILD_TOOLS.}"
-: "${ANDROID_COMMAND_LINE_TOOLS:?Set ANDROID_COMMAND_LINE_TOOLS.}"
 melkit_version_base="${MELKIT_VERSION_CODE_BASE:-0}"
 if [[ ! "$CI_PIPELINE_IID" =~ ^[0-9]{1,9}$ || ! "$melkit_version_base" =~ ^[0-9]{1,9}$ ]]; then
   printf '%s\n' 'Version code inputs must be non-negative integers with at most 9 digits.' >&2
@@ -54,28 +65,9 @@ if (( MELKIT_VERSION_CODE < 1 || MELKIT_VERSION_CODE > 2100000000 )); then
   exit 1
 fi
 
-# The Android module must use the signing/version environment variables above.
-# P0 also verifies the resulting APK certificate and the install-over path.
-export ANDROID_HOME="$ANDROID_SDK_ROOT"
+# The Android module uses the signing/version environment variables above.
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$CI_PROJECT_DIR/.gradle}"
-melkit_sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-if [[ ! -x "$melkit_sdkmanager" ]]; then
-  apt-get update -qq
-  apt-get install -y -qq curl unzip >/dev/null
-  mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-  melkit_tools_dir="$(mktemp -d "$melkit_signing_dir/tools.XXXXXX")"
-  curl --fail --location --silent --show-error \
-    "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_COMMAND_LINE_TOOLS}_latest.zip" \
-    --output "$melkit_tools_dir/tools.zip"
-  unzip -q "$melkit_tools_dir/tools.zip" -d "$melkit_tools_dir/unpacked"
-  mv "$melkit_tools_dir/unpacked/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-fi
-
-# Ignore yes's normal SIGPIPE, while retaining sdkmanager's actual exit status.
-set +o pipefail
-yes | "$melkit_sdkmanager" --licenses >/dev/null
-set -o pipefail
-"$melkit_sdkmanager" "platform-tools" "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}"
+source ci/setup-android.sh
 
 chmod +x gradlew
 melkit_tasks=(:app:assembleRelease)

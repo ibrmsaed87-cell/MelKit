@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MelKit" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">#101513</item>
+        <item name="android:statusBarColor">#101513</item>
+        <item name="android:navigationBarColor">#101513</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="colorAccent">#A4F56A</item>
+    </style>
+</resources>

@@ -1,0 +1,81 @@
+<resources>
+    <string name="app_name" translatable="false">MelKit</string>
+    <string name="language_arabic" translatable="false">العربية</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="empty_count" translatable="false">—</string>
+    <string name="home">Home</string>
+    <string name="library">Library</string>
+    <string name="backups">Backups</string>
+    <string name="sharing">Share</string>
+    <string name="tools">Tools</string>
+    <string name="more_apps">More apps</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="tagline">Your mods and creations, all together</string>
+    <string name="your_library">Your library</string>
+    <string name="mods">Mods</string>
+    <string name="maps">Maps</string>
+    <string name="saves">Saves</string>
+    <string name="not_connected">No library connected yet</string>
+    <string name="backup_action">Back up</string>
+    <string name="backup_subtitle">Keep your creations</string>
+    <string name="transfer_action">Phone transfer</string>
+    <string name="transfer_subtitle">Share without internet</string>
+    <string name="profiles">Mod profiles</string>
+    <string name="profiles_subtitle">Load what you need</string>
+    <string name="scanner">Check files</string>
+    <string name="scanner_subtitle">Review duplicates and damage</string>
+    <string name="current_profile">Current profile</string>
+    <string name="no_profile">No active profile yet</string>
+    <string name="manage">Manage</string>
+    <string name="last_backup">Latest backup</string>
+    <string name="no_backup">No backup yet</string>
+    <string name="view">View</string>
+    <string name="preview_notice">Early preview: explore the design and languages. Game file operations are not active yet.</string>
+    <string name="in_preparation">In preparation</string>
+    <string name="library_description">Browse mods, maps, and saves with search, sorting, and multiple selection.</string>
+    <string name="library_empty">Your content will appear here</string>
+    <string name="backups_description">Keep full or selected backups outside the game folder, and choose what to restore.</string>
+    <string name="backups_empty">A safe place for your creations</string>
+    <string name="sharing_description">Send selected game content directly to another phone, or share a saved bundle through your apps.</string>
+    <string name="send">Send</string>
+    <string name="receive">Receive</string>
+    <string name="send_hint">Choose content, then show a QR code</string>
+    <string name="receive_hint">Scan the sender’s QR code</string>
+    <string name="share_bundle">Content bundles</string>
+    <string name="bundle_description">Collect selected mods, maps, and saves into one shareable bundle.</string>
+    <string name="profiles_description">Create groups for cars, battles, and more. Switch groups while keeping essential mods enabled.</string>
+    <string name="toggler">Mod switches</string>
+    <string name="toggler_description">Move unused mods to a separate vault and restore them when needed, without downloading them again.</string>
+    <string name="scanner_description">Review empty and duplicate files, supported-format errors, and files that could not be checked. Quarantine is reversible.</string>
+    <string name="categories">Categories and names</string>
+    <string name="categories_description">Organize your library with personal names and categories while preserving original game files.</string>
+    <string name="thumbnails">Thumbnail maker</string>
+    <string name="thumbnails_description">Choose a screenshot and crop a cover for your mod or bundle inside MelKit.</string>
+    <string name="history">Activity and undo</string>
+    <string name="history_description">Review changes and undo supported operations with the original files preserved.</string>
+    <string name="shizuku_guide">Shizuku setup guide</string>
+    <string name="shizuku_description">First-time pairing and everyday starts</string>
+    <string name="shizuku_first_title">First-time setup</string>
+    <string name="shizuku_first_body">Install Shizuku from its official download page. Open Shizuku and follow its wireless debugging and pairing instructions. Enter the pairing code in the Shizuku notification, start the service, then authorize MelKit when file access is available.</string>
+    <string name="shizuku_later_title">Next time</string>
+    <string name="shizuku_later_body">Usually, open Shizuku and start the service. Repeat pairing only if Shizuku or Android requests it.</string>
+    <string name="shizuku_video_note">The Arabic and English tutorial videos will be added to this guide.</string>
+    <string name="official_download">Official Shizuku download</string>
+    <string name="language">App language</string>
+    <string name="language_description">Choose Arabic or English. The layout follows your language.</string>
+    <string name="appearance">Appearance</string>
+    <string name="dark_theme">Dark theme</string>
+    <string name="version">Version %1$s</string>
+    <string name="open_store">Open in Google Play</string>
+    <string name="coming_to_store">Coming to Google Play</string>
+    <string name="mmix_name" translatable="false">MMIX</string>
+    <string name="mcfx_name" translatable="false">MCFX</string>
+    <string name="mmkb_name" translatable="false">MMKB</string>
+    <string name="mmix_description">Import Melon Sandbox mods, maps, and files easily.</string>
+    <string name="mcfx_description">Fix and import Minecraft packs, add-ons, and worlds.</string>
+    <string name="mmkb_description">Back up, restore, and share your Minecraft content.</string>
+    <string name="developer_description">Explore more gaming tools from Spinel.</string>
+    <string name="open_link_error">No app is available to open this link.</string>
+</resources>
