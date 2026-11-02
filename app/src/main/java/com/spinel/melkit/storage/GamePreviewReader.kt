@@ -11,6 +11,7 @@ import java.util.Locale
 internal object GamePreviewReader {
     fun read(file: File): ByteArray = when (file.extension.lowercase(Locale.ROOT)) {
         "melmap" -> PreviewImages.readMap(file)
+        "melworld" -> PreviewImages.readWorld(file)
         "melmod", "melsave" -> readIcon(file)
         else -> byteArrayOf()
     }

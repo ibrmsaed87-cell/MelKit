@@ -97,6 +97,7 @@
     <string name="library_folder">مجلد</string>
     <string name="library_mod">ملف مود</string>
     <string name="library_map">ملف خريطة</string>
+    <string name="library_world">ملف عالم</string>
     <string name="library_save">ملف حفظ</string>
     <string name="library_other">ملف آخر</string>
     <string name="library_open_folder">فتح المجلد</string>

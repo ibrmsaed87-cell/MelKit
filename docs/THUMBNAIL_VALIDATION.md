@@ -1,4 +1,4 @@
-# Embedded library previews — 0.1.3
+# Embedded library previews — 0.1.4
 
 ## Request and observed files
 
@@ -10,12 +10,13 @@ format first; keep optional preview reading separate from file-validity checks.
 | `Controllable_melon.melmap` | ZIP member `MapPreview`; `MetaData.PreviewImage.AssetId` points to it | 29,428 | 445×317 |
 | `Blue Android.melmod` | Root JSON `icon` array of byte values | 262 | 12×11 |
 | `save.melsave` | Root JSON `icon` array of byte values | 1,851 | 64×64 |
+| `cake driver.melworld` | ZIP member `WorldPreviewImage`; root `MetaData.PreviewImage.AssetId` points to it | 320,569 | 512×512 |
 
-All three extracted images were opened and verified as PNGs locally. The map sample's
+All four extracted images were opened and verified as PNGs locally. The map sample's
 SHA-256 matches the phone's earlier successful read/export proof:
 `cf0a67f087ad33f04441cbf0767ea9536adf54e806ef9189c860d29303811e8a`.
 No user samples or extracted assets are committed or bundled in the application.
-No distinct Worlds content format has been supplied or verified.
+The world template and player-progress folder are distinct; see [world findings](WORLDS_VALIDATION.md).
 
 ## Implementation
 
@@ -23,9 +24,12 @@ No distinct Worlds content format has been supplied or verified.
   policy and accepts regular files only. Existing export/read endpoints are unchanged.
 - `.melmap`: read only the exact `MapPreview` member through `ZipFile`, without expanding
   textures or extracting archive paths. Verify the member size and CRC before decoding.
+- `.melworld`: use the same bounded ZIP reader for the exact `WorldPreviewImage` member.
+  Classify these files as World file / ملف عالم with a globe fallback icon. The sample PNG
+  exceeds the initial 256 KiB limit; 0.1.4 raises the shared preview limit to 512 KiB.
 - `.melmod`/`.melsave`: use Android `JsonReader` to find the root `icon` array. Stream and
   skip unrelated fields instead of loading model textures or save objects into memory.
-- Return at most 256 KiB per preview through Binder; accept PNG dimensions of 1–4096
+- Return at most 512 KiB per preview through Binder; accept PNG dimensions of 1–4096
   on each side. JSON scanning is bounded to 16 MiB; ZIP previews are optional for archives
   up to 64 MiB and at most 4096 entries. Files outside those preview limits still retain
   their type icon and normal read/export actions.
@@ -44,20 +48,21 @@ No distinct Worlds content format has been supplied or verified.
 ## Verification and remaining phone checks
 
 - Host JVM 17: the existing 24 read-path checks and 26 export-path checks passed.
-- `PreviewImagesCheck`: 23 synthetic cases passed for PNG headers/dimensions, bounded
+- `PreviewImagesCheck`: 27 synthetic cases passed for PNG headers/dimensions, bounded
   reads, exact limits, ZIP extraction, missing previews, unsafe member names, oversized
-  entries/archives, CRC mismatch, and byte-for-byte preservation of the source archive.
-- Two additional host checks use the supplied map and its independently extracted PNG;
-  the Java extractor returns the same image bytes and leaves the archive unchanged.
-- These 23 synthetic preview checks join the existing 50 checks in the GitLab build gate.
+  entries/archives, CRC mismatch, distinct map/world members, a valid PNG larger than
+  256 KiB, and byte-for-byte preservation of the source archive.
+- Four additional host checks use the supplied map and world with independently extracted
+  PNGs; the Java extractor returns matching image bytes and leaves both archives unchanged.
+- These 27 synthetic preview checks join the existing 50 checks in the GitLab build gate.
   Private sample-based checks run locally only, and the game files are not CI artifacts.
-- XML, the existing 117 translated strings, and string references are checked locally.
+- XML, 118 translated strings, and 123 string references are checked locally.
 - Full Android compilation, signing, Android `JsonReader`, `BitmapFactory`, Compose layout,
   and Shizuku/Binder thumbnail reads still require GitLab and phone verification. No local
   Android build or emulator result is claimed.
 
-After the signed 0.1.3 build succeeds, install over the existing app. Confirm the actual
-images on the three supplied file types, fast scrolling and folder refresh, graceful
+After the signed 0.1.4 build succeeds, install over the existing app. Confirm the actual
+images on all four supplied file types, the World file label, fast scrolling and folder refresh, graceful
 fallback for a file without an icon, Arabic/English placement, and organized exports under
 `Download/MelKit`. Restoring files and the wider P1 acceptance remain unimplemented.
 

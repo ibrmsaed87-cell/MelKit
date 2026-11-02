@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.AlertDialog
@@ -223,6 +224,7 @@ private fun EntryCard(entry: GameEntry, enabled: Boolean, model: GameLibraryView
         "folder" -> Icons.Outlined.Folder
         "mod" -> Icons.Outlined.Inventory2
         "map" -> Icons.Outlined.Map
+        "world" -> Icons.Outlined.Public
         "save" -> Icons.Outlined.Save
         else -> Icons.Outlined.Description
     }
@@ -230,6 +232,7 @@ private fun EntryCard(entry: GameEntry, enabled: Boolean, model: GameLibraryView
         "folder" -> R.string.library_folder
         "mod" -> R.string.library_mod
         "map" -> R.string.library_map
+        "world" -> R.string.library_world
         "save" -> R.string.library_save
         else -> R.string.library_other
     }

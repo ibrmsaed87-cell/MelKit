@@ -104,6 +104,7 @@
     <string name="library_folder">Folder</string>
     <string name="library_mod">Mod file</string>
     <string name="library_map">Map file</string>
+    <string name="library_world">World file</string>
     <string name="library_save">Save file</string>
     <string name="library_other">Other file</string>
     <string name="library_open_folder">Open folder</string>

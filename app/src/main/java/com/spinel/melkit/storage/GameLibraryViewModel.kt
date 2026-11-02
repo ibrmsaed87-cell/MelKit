@@ -198,7 +198,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     suspend fun preview(entry: GameEntry, revision: Int): Bitmap? {
-        if (!entry.regular || entry.type !in listOf("mod", "map", "save")) return null
+        if (!entry.regular || entry.type !in listOf("mod", "map", "save", "world")) return null
         val key = "$revision:${entry.path}:${entry.size}:${entry.modified}"
         return previewMutex.withLock {
             previews.get(key)?.let { return@withLock it.bitmap }

@@ -64,6 +64,7 @@ class GameLibraryService : IGameLibrary.Stub() {
         val type = if (isDirectory) "folder" else when (file.extension.lowercase(Locale.ROOT)) {
             "melmod" -> "mod"
             "melmap" -> "map"
+            "melworld" -> "world"
             "melsave" -> "save"
             else -> "other" // Unknown format is never classified as corruption.
         }

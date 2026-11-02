@@ -11,7 +11,8 @@ import java.util.zip.ZipFile;
 
 /** Bounded reads of embedded PNG previews. Never extracts archive paths to disk. */
 public final class PreviewImages {
-    public static final int MAX_IMAGE_BYTES = 256 * 1024;
+    // The verified world preview is 320,569 bytes; stay below Binder's transaction limit.
+    public static final int MAX_IMAGE_BYTES = 512 * 1024;
     public static final int MAX_JSON_BYTES = 16 * 1024 * 1024;
     private static final long MAX_ARCHIVE_BYTES = 64L * 1024 * 1024;
     private static final byte[] PNG = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
@@ -35,10 +36,18 @@ public final class PreviewImages {
     }
 
     public static byte[] readMap(File file) throws IOException {
+        return readArchive(file, "MapPreview");
+    }
+
+    public static byte[] readWorld(File file) throws IOException {
+        return readArchive(file, "WorldPreviewImage");
+    }
+
+    private static byte[] readArchive(File file, String previewName) throws IOException {
         if (file.length() > MAX_ARCHIVE_BYTES) return new byte[0];
         try (ZipFile archive = new ZipFile(file)) {
             if (archive.size() > 4096) return new byte[0];
-            ZipEntry entry = archive.getEntry("MapPreview");
+            ZipEntry entry = archive.getEntry(previewName);
             if (entry == null || entry.isDirectory() || entry.getSize() > MAX_IMAGE_BYTES) return new byte[0];
             try (InputStream input = limited(archive.getInputStream(entry), MAX_IMAGE_BYTES)) {
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
