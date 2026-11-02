@@ -50,6 +50,14 @@ class GameLibraryService : IGameLibrary.Stub() {
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
+    override fun readPreview(storageRoot: String, relativePath: String): ByteArray = try {
+        val file = paths(storageRoot).resolve(relativePath, false)
+        check(OsConstants.S_ISREG(Os.stat(file.path).st_mode))
+        GamePreviewReader.read(file)
+    } catch (_: Exception) {
+        byteArrayOf() // Fall back to the type icon; never classify a file as corrupt.
+    }
+
     private fun metadata(file: File, relativePath: String): JSONObject {
         val stat = Os.stat(file.path)
         val isDirectory = OsConstants.S_ISDIR(stat.st_mode)
@@ -81,3 +89,4 @@ class GameLibraryService : IGameLibrary.Stub() {
 
     companion object { const val PAGE_SIZE = 40 }
 }
+

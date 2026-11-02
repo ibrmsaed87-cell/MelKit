@@ -3,6 +3,7 @@ package com.spinel.melkit.ui
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Build
 import android.text.format.Formatter
 import android.widget.Toast
@@ -10,6 +11,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -43,8 +47,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -139,7 +149,7 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
                 }
             }
             items(state.entries, key = { it.path }) { entry ->
-                EntryCard(entry, state.connected && !state.busy,
+                EntryCard(entry, state.connected && !state.busy, model, state.connected, state.previewRevision,
                     onOpen = { model.browse(entry.path) },
                     onRead = { model.verifyRead(entry) },
                     onExport = {
@@ -201,9 +211,14 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
 }
 
 @Composable
-private fun EntryCard(entry: GameEntry, enabled: Boolean, onOpen: () -> Unit, onRead: () -> Unit, onExport: () -> Unit) {
+private fun EntryCard(entry: GameEntry, enabled: Boolean, model: GameLibraryViewModel, connected: Boolean,
+    previewRevision: Int, onOpen: () -> Unit, onRead: () -> Unit, onExport: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
+    val preview by produceState<Bitmap?>(null, entry, connected, previewRevision) {
+        value = null
+        if (connected) value = model.preview(entry, previewRevision)
+    }
     val icon = when (entry.type) {
         "folder" -> Icons.Outlined.Folder
         "mod" -> Icons.Outlined.Inventory2
@@ -221,7 +236,17 @@ private fun EntryCard(entry: GameEntry, enabled: Boolean, onOpen: () -> Unit, on
     Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(icon, null, tint = MelkitMint, modifier = Modifier.size(30.dp))
+                val bitmap = preview
+                Box(Modifier.size(if (entry.directory) 30.dp else 64.dp).clip(RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center) {
+                    if (bitmap != null) {
+                        Image(bitmap = bitmap.asImageBitmap(), filterQuality = FilterQuality.None,
+                            contentDescription = null, contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest))
+                    } else {
+                        Icon(icon, null, tint = MelkitMint, modifier = Modifier.size(30.dp))
+                    }
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(entry.name, fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.ContentOrLtr))

@@ -4,9 +4,12 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Environment
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.spinel.melkit.BuildConfig
@@ -21,6 +24,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import rikka.shizuku.Shizuku
 import java.io.IOException
@@ -63,6 +68,7 @@ data class GameLibraryState(
     val entries: List<GameEntry> = emptyList(),
     val issue: LibraryIssue? = null,
     val proof: ReadProof? = null,
+    val previewRevision: Int = 0,
 )
 
 /** Owns Shizuku listeners and transfers across rotations; releases the process on exit. */
@@ -76,6 +82,12 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     private var operation: Job? = null
     private var bindTimeout: Job? = null
     private var pendingExport: GameEntry? = null
+    private data class PreviewResult(val bitmap: Bitmap?)
+    private val previewMutex = Mutex()
+    private val previews = object : LruCache<String, PreviewResult>(4 * 1024) {
+        override fun sizeOf(key: String, value: PreviewResult): Int =
+            ((value.bitmap?.allocationByteCount ?: 0) / 1024).coerceAtLeast(1)
+    }
     private val args = Shizuku.UserServiceArgs(ComponentName(application, GameLibraryService::class.java))
         .daemon(false).processNameSuffix("library").tag("melkit-read-library")
         .debuggable(false).version(BuildConfig.VERSION_CODE)
@@ -174,13 +186,46 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                 val entries = List(array.length()) { GameEntry.fromJson(array.getJSONObject(it)) }
                 mutableState.update {
                     it.copy(connected = true, loaded = true, busy = false, path = path,
-                        offset = offset, total = result.getInt("total"), hasNext = result.getBoolean("next"), entries = entries)
+                        offset = offset, total = result.getInt("total"), hasNext = result.getBoolean("next"), entries = entries,
+                        previewRevision = it.previewRevision + 1)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 fail((error as? AccessFailure)?.issue ?: LibraryIssue.READ_FAILED)
             }
+        }
+    }
+
+    suspend fun preview(entry: GameEntry, revision: Int): Bitmap? {
+        if (!entry.regular || entry.type !in listOf("mod", "map", "save")) return null
+        val key = "$revision:${entry.path}:${entry.size}:${entry.modified}"
+        return previewMutex.withLock {
+            previews.get(key)?.let { return@withLock it.bitmap }
+            val bitmap = withContext(Dispatchers.IO) {
+                try {
+                    val service = remote ?: return@withContext null
+                    if (!service.asBinder().pingBinder()) return@withContext null
+                    checkUnchanged(service, entry)
+                    val bytes = service.readPreview(storageRoot, entry.path)
+                    checkUnchanged(service, entry)
+                    if (PreviewImages.validated(bytes).isEmpty()) return@withContext null
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    if (bounds.outWidth !in 1..4096 || bounds.outHeight !in 1..4096) return@withContext null
+                    var sample = 1
+                    while (bounds.outWidth / sample > 256 || bounds.outHeight / sample > 256) sample *= 2
+                    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            previews.put(key, PreviewResult(bitmap))
+            bitmap
         }
     }
 
@@ -336,6 +381,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     override fun onCleared() {
+        previews.evictAll()
         Shizuku.removeBinderReceivedListener(received)
         Shizuku.removeBinderDeadListener(dead)
         Shizuku.removeRequestPermissionResultListener(permission)
