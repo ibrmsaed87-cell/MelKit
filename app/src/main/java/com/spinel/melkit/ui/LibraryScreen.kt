@@ -1,6 +1,9 @@
 package com.spinel.melkit.ui
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -19,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Folder
@@ -47,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
+import androidx.core.content.ContextCompat
 import com.spinel.melkit.R
 import com.spinel.melkit.storage.GameEntry
 import com.spinel.melkit.storage.GameLibraryState
@@ -67,8 +73,8 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
     BackHandler(enabled = state.path.isNotEmpty() && state.connected && !state.busy && state.proof == null) {
         model.browse(state.path.substringBeforeLast('/', ""))
     }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) {
-        model.exportTo(it)
+    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        model.exportPrepared(it)
     }
     LazyColumn(
         state = listState,
@@ -136,7 +142,15 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
                 EntryCard(entry, state.connected && !state.busy,
                     onOpen = { model.browse(entry.path) },
                     onRead = { model.verifyRead(entry) },
-                    onExport = { if (model.prepareExport(entry)) picker.launch(entry.name) })
+                    onExport = {
+                        if (model.prepareExport(entry)) {
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                                PackageManager.PERMISSION_GRANTED) {
+                                storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            } else model.exportPrepared(true)
+                        }
+                    })
             }
             if (state.total > 0) {
                 item {
@@ -164,9 +178,15 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
             onDismissRequest = model::dismissProof,
             title = { Text(stringResource(if (proof.exported) R.string.library_export_verified else R.string.library_read_verified)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(proof.name)
                     Text(Formatter.formatFileSize(context, proof.bytes))
+                    proof.savedPath?.let { path ->
+                        Text(stringResource(R.string.library_saved_location))
+                        SelectionContainer {
+                            Text(path, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr))
+                        }
+                    }
                     Text(stringResource(R.string.library_fingerprint))
                     SelectionContainer {
                         Text(proof.sha256, style = MaterialTheme.typography.bodySmall.copy(
@@ -238,6 +258,7 @@ private fun issueText(issue: LibraryIssue): Int = when (issue) {
     LibraryIssue.SOURCE_CHANGED -> R.string.library_source_changed
     LibraryIssue.EXPORT_FAILED -> R.string.library_export_failed
     LibraryIssue.PARTIAL_EXPORT -> R.string.library_partial_export
+    LibraryIssue.STORAGE_PERMISSION -> R.string.library_storage_permission
 }
 
 private fun openShizuku(context: Context) {
@@ -246,3 +267,4 @@ private fun openShizuku(context: Context) {
         Toast.makeText(context, R.string.library_shizuku_not_installed, Toast.LENGTH_LONG).show()
     }
 }
+

@@ -4,11 +4,9 @@ import android.app.Application
 import android.content.ComponentName
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Environment
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import android.provider.DocumentsContract
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.spinel.melkit.BuildConfig
@@ -48,10 +46,11 @@ data class GameEntry(
 
 enum class LibraryIssue {
     START_SHIZUKU, UPDATE_SHIZUKU, PERMISSION_DENIED, CONNECT_FAILED,
-    MISSING_FOLDER, ACCESS_DENIED, READ_FAILED, SOURCE_CHANGED, EXPORT_FAILED, PARTIAL_EXPORT,
+    MISSING_FOLDER, ACCESS_DENIED, READ_FAILED, SOURCE_CHANGED, EXPORT_FAILED, PARTIAL_EXPORT, STORAGE_PERMISSION,
 }
 
-data class ReadProof(val name: String, val bytes: Long, val sha256: String, val exported: Boolean)
+data class ReadProof(val name: String, val bytes: Long, val sha256: String, val exported: Boolean,
+    val savedPath: String? = null)
 
 data class GameLibraryState(
     val connected: Boolean = false,
@@ -213,46 +212,51 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         if (mutableState.value.busy || !mutableState.value.connected || !entry.regular) return false
         if (authorizedService() == null) return false
         pendingExport = entry
+        mutableState.update { it.copy(busy = true, issue = null, proof = null) }
         return true
     }
 
-    fun exportTo(uri: Uri?) {
+    fun exportPrepared(storageGranted: Boolean) {
         val entry = pendingExport ?: return
         pendingExport = null
-        if (uri == null) return
-        val service = authorizedService()
+        if (!storageGranted) {
+            fail(LibraryIssue.STORAGE_PERMISSION)
+            return
+        }
+        val service = authorizedService() ?: return
         operation = viewModelScope.launch {
             mutableState.update { it.copy(busy = true, issue = null, proof = null) }
-            val resolver = getApplication<Application>().contentResolver
+            var destination: DownloadCopy? = null
             try {
                 val proof = withContext(Dispatchers.IO) {
-                    if (service == null) throw IOException("Disconnected")
                     checkUnchanged(service, entry)
+                    val copy = DownloadCopy.create(getApplication<Application>(), entry.path)
+                    destination = copy
                     val copied = ParcelFileDescriptor.AutoCloseInputStream(
                         service.openRead(storageRoot, entry.path),
                     ).use { input ->
-                        (resolver.openOutputStream(uri, "wt") ?: throw IOException("No output stream")).use { output ->
+                        copy.openOutput().use { output ->
                             digest(input) { buffer, count -> output.write(buffer, 0, count) }
                         }
                     }
                     if (copied.first != entry.size) throw AccessFailure(LibraryIssue.SOURCE_CHANGED)
                     checkUnchanged(service, entry)
-                    val verified = (resolver.openInputStream(uri) ?: throw IOException("Cannot verify copy"))
-                        .use { digest(it) }
+                    val verified = copy.openInput().use { digest(it) }
                     if (verified != copied) throw IOException("Copy verification failed")
                     val sourceVerified = ParcelFileDescriptor.AutoCloseInputStream(
                         service.openRead(storageRoot, entry.path),
                     ).use { digest(it) }
                     if (sourceVerified != copied) throw AccessFailure(LibraryIssue.SOURCE_CHANGED)
                     checkUnchanged(service, entry)
-                    ReadProof(entry.name, copied.first, copied.second, true)
+                    val savedPath = copy.publish()
+                    ReadProof(entry.name, copied.first, copied.second, true, savedPath)
                 }
                 mutableState.update { it.copy(busy = false, proof = proof) }
             } catch (error: Exception) {
-                // Only remove the newly created destination document, never a game file.
+                // Only remove this newly created Downloads copy, never a game file or older copy.
                 // Cleanup also runs after cancellation (for example, leaving the app).
                 val removed = withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
-                    runCatching { DocumentsContract.deleteDocument(resolver, uri) }.getOrDefault(false)
+                    runCatching { destination?.remove() ?: true }.getOrDefault(false)
                 }
                 if (error is CancellationException) throw error
                 fail(if (!removed) LibraryIssue.PARTIAL_EXPORT else
@@ -342,3 +346,4 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     private class AccessFailure(val issue: LibraryIssue) : IOException()
     companion object { private const val REQUEST_ACCESS = 201 }
 }
+

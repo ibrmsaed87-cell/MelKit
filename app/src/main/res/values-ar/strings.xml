@@ -72,7 +72,7 @@
     <string name="developer_description">اكتشف المزيد من أدوات الألعاب من Spinel.</string>
     <string name="open_link_error">لا يوجد تطبيق يمكنه فتح هذا الرابط.</string>
     <string name="game_library">مكتبة اللعبة</string>
-    <string name="library_readonly_notice">تجربة الوصول: تصفّح الملفات واختبر قراءتها أو احفظ نسخة من ملف في التنزيلات. أغلق اللعبة أولًا. تبقى ملفات اللعبة كما هي.</string>
+    <string name="library_readonly_notice">تجربة الوصول: تصفّح الملفات واختبر قراءتها أو احفظ نسخة داخل Download/MelKit، مرتبة حسب مجلدها في اللعبة. أغلق اللعبة أولًا. تبقى ملفات اللعبة كما هي.</string>
     <string name="library_connect_title">ربط ملفات اللعبة</string>
     <string name="library_connect_body">شغّل Shizuku، ثم اضغط ربط واسمح لـ MelKit بالوصول عند الطلب.</string>
     <string name="library_connected">متصل بـ Shizuku</string>
@@ -110,8 +110,11 @@
     <string name="library_access_denied">رُفض الوصول إلى هذا المسار. تحقق من تشغيل Shizuku وإذن MelKit. هذا لا يعني تلف الملفات.</string>
     <string name="library_read_failed">تعذرت قراءة الملف أو المجلد. حدّث وأعد المحاولة. لم نصنّف محتواه على أنه تالف.</string>
     <string name="library_source_changed">تغيّر الملف بعد عرض المجلد. أغلق اللعبة وحدّث، ثم أعد المحاولة.</string>
-    <string name="library_export_failed">تعذر إكمال النسخة والتحقق منها، وأُزيل الملف الجديد. جرّب موقعًا آخر تتوفر فيه مساحة كافية.</string>
+    <string name="library_export_failed">تعذر حفظ النسخة والتحقق منها داخل Download/MelKit. أُزيلت أي نسخة جديدة غير مكتملة. تحقق من المساحة المتاحة وحاول مجددًا.</string>
+    <string name="library_saved_location">مكان الحفظ</string>
+    <string name="library_storage_permission">اسمح بالوصول إلى التخزين لحفظ النسخ داخل Download/MelKit على Android 7–9، ثم اضغط حفظ نسخة مجددًا.</string>
     <string name="library_partial_export">تعذر التحقق من النسخة وإزالة ملفها الجديد. راجع موقع الحفظ واحذف النسخة غير المكتملة قبل إعادة المحاولة. ملف اللعبة لم يتغير.</string>
     <string name="library_shizuku_not_installed">تعذر فتح Shizuku. استخدم دليل الإعداد للوصول إلى التنزيل الرسمي.</string>
     <string name="library_browse">تصفّح ملفات اللعبة</string>
 </resources>
+
