@@ -52,6 +52,7 @@ public final class PreviewImagesCheck {
             Path map = archive(temp.resolve("valid.melmap"), "MapPreview", png, false);
             byte[] before = Files.readAllBytes(map);
             expect(Arrays.equals(PreviewImages.readMap(map.toFile()), png));
+            expect(Arrays.equals(PreviewImages.readStream(new ByteArrayInputStream(before), false), png));
             expect(Arrays.equals(Files.readAllBytes(map), before));
             var worldOutput = new ByteArrayOutputStream();
             var worldImage = new BufferedImage(320, 320, BufferedImage.TYPE_INT_ARGB);
@@ -64,6 +65,7 @@ public final class PreviewImagesCheck {
             expect(worldPng.length > 256 * 1024 && worldPng.length <= PreviewImages.MAX_IMAGE_BYTES);
             Path world = archive(temp.resolve("valid.melworld"), "WorldPreviewImage", worldPng, false);
             expect(Arrays.equals(PreviewImages.readWorld(world.toFile()), worldPng));
+            expect(Arrays.equals(PreviewImages.readStream(new ByteArrayInputStream(Files.readAllBytes(world)), true), worldPng));
             expect(PreviewImages.readWorld(map.toFile()).length == 0);
             expect(PreviewImages.readMap(world.toFile()).length == 0);
             Path missing = archive(temp.resolve("missing.melmap"), "Data", png, false);
@@ -89,11 +91,13 @@ public final class PreviewImagesCheck {
             if (args.length >= 2) {
                 byte[] sampleBefore = Files.readAllBytes(Path.of(args[0]));
                 expect(Arrays.equals(PreviewImages.readMap(new File(args[0])), Files.readAllBytes(Path.of(args[1]))));
+                expect(Arrays.equals(PreviewImages.readStream(new ByteArrayInputStream(sampleBefore), false), Files.readAllBytes(Path.of(args[1]))));
                 expect(Arrays.equals(Files.readAllBytes(Path.of(args[0])), sampleBefore));
             }
             if (args.length == 4) {
                 byte[] sampleBefore = Files.readAllBytes(Path.of(args[2]));
                 expect(Arrays.equals(PreviewImages.readWorld(new File(args[2])), Files.readAllBytes(Path.of(args[3]))));
+                expect(Arrays.equals(PreviewImages.readStream(new ByteArrayInputStream(sampleBefore), true), Files.readAllBytes(Path.of(args[3]))));
                 expect(Arrays.equals(Files.readAllBytes(Path.of(args[2])), sampleBefore));
             }
             System.out.println("Preview image checks passed: " + checks);

@@ -11,7 +11,7 @@ import java.io.IOException
 import java.util.Locale
 import kotlin.system.exitProcess
 
-/** Runs in Shizuku's dedicated shell process, never in the application's UI process. */
+/** Scoped game access in Shizuku's dedicated process. */
 class GameLibraryService : IGameLibrary.Stub() {
     override fun destroy() { exitProcess(0) }
 
@@ -56,6 +56,27 @@ class GameLibraryService : IGameLibrary.Stub() {
         GamePreviewReader.read(file)
     } catch (_: Exception) {
         byteArrayOf() // Fall back to the type icon; never classify a file as corrupt.
+    }
+
+    @Synchronized
+    override fun restoreFile(storageRoot: String, relativePath: String, source: ParcelFileDescriptor,
+        expectedBytes: Long, expectedSha: String): String {
+        return ParcelFileDescriptor.AutoCloseInputStream(source).use { input ->
+            try {
+                val policy = paths(storageRoot)
+                policy.resolve(relativePath, false)
+                NewFileRestore.restore(policy.resolve("", true), relativePath, input, expectedBytes, expectedSha)
+                JSONObject().put("status", "ok").toString()
+            } catch (_: NewFileRestore.AlreadyExists) {
+                JSONObject().put("status", "exists").toString()
+            } catch (_: NewFileRestore.SourceChanged) {
+                JSONObject().put("status", "changed").toString()
+            } catch (_: NewFileRestore.PartialCopy) {
+                JSONObject().put("status", "partial").toString()
+            } catch (_: Exception) {
+                JSONObject().put("status", "failed").toString()
+            }
+        }
     }
 
     private fun metadata(file: File, relativePath: String): JSONObject {

@@ -5,7 +5,6 @@ import android.content.ComponentName
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Environment
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
@@ -209,14 +208,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                     checkUnchanged(service, entry)
                     val bytes = service.readPreview(storageRoot, entry.path)
                     checkUnchanged(service, entry)
-                    if (PreviewImages.validated(bytes).isEmpty()) return@withContext null
-                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                    if (bounds.outWidth !in 1..4096 || bounds.outHeight !in 1..4096) return@withContext null
-                    var sample = 1
-                    while (bounds.outWidth / sample > 256 || bounds.outHeight / sample > 256) sample *= 2
-                    val options = BitmapFactory.Options().apply { inSampleSize = sample }
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+                    PreviewBitmap.decode(bytes)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -226,6 +218,27 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
             currentCoroutineContext().ensureActive()
             previews.put(key, PreviewResult(bitmap))
             bitmap
+        }
+    }
+
+    suspend fun restoreSaved(path: String, expectedBytes: Long, openSource: () -> ParcelFileDescriptor): String {
+        if (mutableState.value.busy) return "busy"
+        val service = authorizedService() ?: return "connect"
+        mutableState.update { it.copy(busy = true, issue = null) }
+        return try {
+            withContext(Dispatchers.IO) {
+                val proof = ParcelFileDescriptor.AutoCloseInputStream(openSource()).use { digest(it) }
+                if (proof.first != expectedBytes) return@withContext "changed"
+                openSource().use { descriptor ->
+                    JSONObject(service.restoreFile(storageRoot, path, descriptor, proof.first, proof.second)).getString("status")
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            "failed"
+        } finally {
+            mutableState.update { it.copy(busy = false) }
         }
     }
 

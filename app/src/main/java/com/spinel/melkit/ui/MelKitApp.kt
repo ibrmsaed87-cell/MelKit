@@ -88,6 +88,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spinel.melkit.BuildConfig
 import com.spinel.melkit.R
 import com.spinel.melkit.storage.GameLibraryViewModel
+import com.spinel.melkit.storage.SavedCopiesViewModel
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
 private data class Feature(val route: String, val title: Int, val description: Int, val icon: ImageVector)
@@ -115,6 +116,8 @@ private val features = listOf(
 fun MelKitApp() {
     val libraryModel: GameLibraryViewModel = viewModel()
     val libraryState by libraryModel.state.collectAsState()
+    val savedModel: SavedCopiesViewModel = viewModel()
+    val savedState by savedModel.state.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -173,6 +176,8 @@ fun MelKitApp() {
             key(route) {
                 if (route == "library") {
                     LibraryScreen(libraryState, libraryModel) { navigate("shizuku") }
+                } else if (route == "backups") {
+                    SavedCopiesScreen(savedState, savedModel, libraryModel, libraryState)
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -181,7 +186,6 @@ fun MelKitApp() {
                     ) {
                         when (route) {
                             "home" -> HomeScreen(navigate, libraryState.connected)
-                            "backups" -> PlannedScreen(R.string.backups_empty, R.string.backups_description, Icons.Outlined.Archive)
                             "share" -> ShareScreen(navigate)
                             "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
                             "settings" -> SettingsScreen()
@@ -430,3 +434,4 @@ private fun openExternal(context: Context, url: String) {
         Toast.makeText(context, R.string.open_link_error, Toast.LENGTH_SHORT).show()
     }
 }
+

@@ -117,5 +117,21 @@
     <string name="library_partial_export">تعذر التحقق من النسخة وإزالة ملفها الجديد. راجع موقع الحفظ واحذف النسخة غير المكتملة قبل إعادة المحاولة. ملف اللعبة لم يتغير.</string>
     <string name="library_shizuku_not_installed">تعذر فتح Shizuku. استخدم دليل الإعداد للوصول إلى التنزيل الرسمي.</string>
     <string name="library_browse">تصفّح ملفات اللعبة</string>
+    <string name="saved_title">الملفات المحفوظة</string>
+    <string name="saved_body">استعرض نسخك داخل Download/MelKit واستعد الملف المحفوظ إلى اللعبة.</string>
+    <string name="saved_empty">لا توجد نسخ محفوظة بعد. احفظ ملفًا من المكتبة أولًا.</string>
+    <string name="saved_permission">تعذر الوصول إلى الملفات المحفوظة. على Android 7–9، اسمح بالوصول إلى التخزين ثم حدّث القائمة.</string>
+    <string name="saved_allow">السماح بالوصول إلى التخزين</string>
+    <string name="saved_read_error">تعذر عرض النسخ المحفوظة. تحقق من مجلد MelKit داخل التنزيلات وحدّث القائمة.</string>
+    <string name="saved_connect_help">شغّل Shizuku وامنح MelKit الإذن. يمكنك الربط أيضًا من تبويب المكتبة.</string>
+    <string name="saved_restore">استعادة إلى اللعبة</string>
+    <string name="saved_confirm_title">استعادة هذا الملف؟</string>
+    <string name="saved_confirm_body">أغلق Melon Sandbox أولًا. ستبقى النسخة المحفوظة في التنزيلات. إذا وُجد ملف بالاسم نفسه داخل اللعبة فسيبقى دون تغيير.</string>
+    <string name="saved_cancel">إلغاء</string>
+    <string name="saved_exists">يوجد ملف بهذا الاسم داخل اللعبة وقد بقي دون تغيير. اختر نسخة محفوظة باسم مختلف.</string>
+    <string name="saved_restore_error">تعذر إكمال الاستعادة والتحقق منها. النسخة المحفوظة لم تتغير.</string>
+    <string name="saved_partial">لم تكتمل الاستعادة وتعذر إزالة ملفها الجديد. راجع مكان الاستعادة قبل المحاولة مجددًا. النسخة المحفوظة لم تتغير.</string>
+    <string name="saved_restored">تمت استعادة الملف والتحقق منه</string>
+    <string name="saved_restored_body">افتح Melon Sandbox وتأكد من ظهور الملف المستعاد. نسختك المحفوظة ما زالت في التنزيلات.</string>
 </resources>
 

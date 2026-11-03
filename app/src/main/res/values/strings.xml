@@ -124,5 +124,21 @@
     <string name="library_partial_export">The copy could not be verified, and its new document could not be removed. Check the destination and remove any incomplete copy before retrying. The game file is unchanged.</string>
     <string name="library_shizuku_not_installed">Could not open Shizuku. Use the setup guide for the official download.</string>
     <string name="library_browse">Browse game files</string>
+    <string name="saved_title">Saved copies</string>
+    <string name="saved_body">Browse copies in Download/MelKit and restore a saved file to the game.</string>
+    <string name="saved_empty">No saved copies yet. Save a file from the Library first.</string>
+    <string name="saved_permission">Saved files are not accessible. On Android 7–9, allow storage access and refresh.</string>
+    <string name="saved_allow">Allow storage access</string>
+    <string name="saved_read_error">Could not load saved copies. Check the MelKit folder in Downloads and refresh.</string>
+    <string name="saved_connect_help">Start Shizuku and allow MelKit access. You can also connect from the Library.</string>
+    <string name="saved_restore">Restore to game</string>
+    <string name="saved_confirm_title">Restore this file?</string>
+    <string name="saved_confirm_body">Close Melon Sandbox first. The saved copy will stay in Downloads. A file with the same name in the game will be kept unchanged.</string>
+    <string name="saved_cancel">Cancel</string>
+    <string name="saved_exists">A file with this name already exists in the game and was kept unchanged. Choose a saved copy with a different filename.</string>
+    <string name="saved_restore_error">Could not complete and verify the restore. The saved copy is unchanged.</string>
+    <string name="saved_partial">The restore did not finish and its new file could not be removed. Check the destination before trying again. The saved copy is unchanged.</string>
+    <string name="saved_restored">File restored and verified</string>
+    <string name="saved_restored_body">Open Melon Sandbox and check that the restored file appears. Your saved copy remains in Downloads.</string>
 </resources>
 

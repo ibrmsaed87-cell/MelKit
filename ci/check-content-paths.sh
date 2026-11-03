@@ -6,8 +6,10 @@ javac -encoding UTF-8 -d "$melkit_test_dir" \
   app/src/main/java/com/spinel/melkit/storage/ContentPaths.java \
   app/src/main/java/com/spinel/melkit/storage/ExportPaths.java \
   app/src/main/java/com/spinel/melkit/storage/PreviewImages.java \
-  tests/ContentPathsCheck.java tests/ExportPathsCheck.java tests/PreviewImagesCheck.java
+  app/src/main/java/com/spinel/melkit/storage/NewFileRestore.java \
+  tests/ContentPathsCheck.java tests/ExportPathsCheck.java tests/PreviewImagesCheck.java tests/RestoreCheck.java
 java -cp "$melkit_test_dir" ContentPathsCheck
 java -cp "$melkit_test_dir" ExportPathsCheck
 java -cp "$melkit_test_dir" PreviewImagesCheck
+java -cp "$melkit_test_dir" RestoreCheck
 

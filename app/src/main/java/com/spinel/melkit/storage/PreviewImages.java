@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 /** Bounded reads of embedded PNG previews. Never extracts archive paths to disk. */
 public final class PreviewImages {
@@ -41,6 +42,33 @@ public final class PreviewImages {
 
     public static byte[] readWorld(File file) throws IOException {
         return readArchive(file, "WorldPreviewImage");
+    }
+
+    public static byte[] readStream(InputStream source, boolean world) throws IOException {
+        String name = world ? "WorldPreviewImage" : "MapPreview";
+        try (ZipInputStream zip = new ZipInputStream(limited(source, MAX_ARCHIVE_BYTES))) {
+            byte[] buffer = new byte[8192];
+            long scanned = 0;
+            int entries = 0;
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (++entries > 4096) return new byte[0];
+                boolean preview = entry.getName().equals(name) && !entry.isDirectory();
+                if (preview && entry.getSize() > MAX_IMAGE_BYTES) return new byte[0];
+                ByteArrayOutputStream output = preview ? new ByteArrayOutputStream() : null;
+                int count;
+                while ((count = zip.read(buffer)) != -1) {
+                    scanned += count;
+                    if (scanned > MAX_JSON_BYTES) return new byte[0];
+                    if (output != null) {
+                        if (output.size() + count > MAX_IMAGE_BYTES) return new byte[0];
+                        output.write(buffer, 0, count);
+                    }
+                }
+                if (output != null) return validated(output.toByteArray());
+            }
+            return new byte[0];
+        }
     }
 
     private static byte[] readArchive(File file, String previewName) throws IOException {

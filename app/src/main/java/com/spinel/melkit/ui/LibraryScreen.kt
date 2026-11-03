@@ -198,10 +198,12 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
                             Text(path, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr))
                         }
                     }
-                    Text(stringResource(R.string.library_fingerprint))
-                    SelectionContainer {
-                        Text(proof.sha256, style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace, textDirection = TextDirection.Ltr))
+                    if (!proof.exported) {
+                        Text(stringResource(R.string.library_fingerprint))
+                        SelectionContainer {
+                            Text(proof.sha256, style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace, textDirection = TextDirection.Ltr))
+                        }
                     }
                     if (proof.exported) Text(stringResource(R.string.library_original_preserved))
                 }
