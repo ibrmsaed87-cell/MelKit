@@ -13,7 +13,8 @@ data class VaultMod(val id: String, val path: String, val name: String, val stat
 
 data class ModVaultState(val entries: List<VaultMod> = emptyList(), val loaded: Boolean = false,
     val busy: Boolean = false, val offset: Int = 0, val hasNext: Boolean = false, val warnings: Int = 0,
-    val revision: Int = 0, val issue: String? = null, val request: VaultMod? = null, val result: String? = null)
+    val revision: Int = 0, val issue: String? = null, val request: VaultMod? = null, val result: String? = null,
+    val tab: Int = 0, val activeCount: Int = 0, val disabledCount: Int = 0)
 
 class ModVaultViewModel : ViewModel() {
     private val mutableState = MutableStateFlow(ModVaultState())
@@ -31,7 +32,7 @@ class ModVaultViewModel : ViewModel() {
     }
 
     private suspend fun load(library: GameLibraryViewModel, offset: Int) {
-        val response = library.listMods(offset)
+        val response = library.listMods(offset, mutableState.value.tab + 1)
         if (response.getString("status") != "ok") {
             mutableState.update { it.copy(issue = response.getString("status")) }; return
         }
@@ -42,7 +43,14 @@ class ModVaultViewModel : ViewModel() {
                 item.getLong("size"), item.getLong("modified"))
         }
         mutableState.update { it.copy(entries = entries, loaded = true, offset = offset,
-            warnings = response.getInt("warnings"), hasNext = response.getBoolean("next"), revision = it.revision + 1) }
+            warnings = response.getInt("warnings"), hasNext = response.getBoolean("next"), revision = it.revision + 1,
+            activeCount = response.getInt("active"), disabledCount = response.getInt("disabled")) }
+    }
+
+    fun selectTab(library: GameLibraryViewModel, tab: Int) {
+        if (mutableState.value.busy || library.state.value.busy || tab == mutableState.value.tab) return
+        mutableState.update { it.copy(tab = tab, offset = 0, entries = emptyList(), loaded = false) }
+        if (library.state.value.connected) refresh(library)
     }
 
     fun request(entry: VaultMod) { if (!mutableState.value.busy) mutableState.update { it.copy(request = entry, issue = null, result = null) } }

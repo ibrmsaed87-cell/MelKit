@@ -266,7 +266,13 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    suspend fun listMods(offset: Int): JSONObject = modCall { it.listMods(storageRoot, offset) }
+    suspend fun listMods(offset: Int, filter: Int = 0): JSONObject = modCall { it.listMods(storageRoot, offset, filter) }
+
+    suspend fun profiles(action: String, payload: JSONObject = JSONObject()): JSONObject {
+        val body = payload.toString()
+        if (body.toByteArray(Charsets.UTF_8).size > 400_000) return JSONObject().put("status", "limit")
+        return modCall { it.profiles(storageRoot, action, body) }
+    }
 
     suspend fun toggleMod(entry: VaultMod): JSONObject = modCall {
         it.toggleMod(storageRoot, entry.path, entry.id, entry.id.isNotEmpty(), entry.bytes, entry.modified)

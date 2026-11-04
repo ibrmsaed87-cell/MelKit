@@ -65,6 +65,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -90,6 +91,9 @@ import com.spinel.melkit.R
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.SavedCopiesViewModel
 import com.spinel.melkit.storage.ModVaultViewModel
+import com.spinel.melkit.storage.ModProfilesViewModel
+import com.spinel.melkit.storage.ModProfilesState
+import kotlinx.coroutines.flow.first
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
 private data class Feature(val route: String, val title: Int, val description: Int, val icon: ImageVector)
@@ -121,6 +125,8 @@ fun MelKitApp() {
     val savedState by savedModel.state.collectAsState()
     val vaultModel: ModVaultViewModel = viewModel()
     val vaultState by vaultModel.state.collectAsState()
+    val profilesModel: ModProfilesViewModel = viewModel()
+    val profilesState by profilesModel.state.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -150,7 +156,11 @@ fun MelKitApp() {
                     }
                 },
                 navigationIcon = {
-                    if (!root) IconButton(onClick = { route = parent }) {
+                    if (!root) IconButton(onClick = {
+                        if (route == "profiles" && profilesState.editor != null) {
+                            if (!profilesState.busy && !libraryState.busy) profilesModel.closeEditor()
+                        } else route = parent
+                    }) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
                     }
                 },
@@ -183,6 +193,8 @@ fun MelKitApp() {
                     SavedCopiesScreen(savedState, savedModel, libraryModel, libraryState)
                 } else if (route == "toggles") {
                     ModVaultScreen(vaultState, vaultModel, libraryModel, libraryState) { navigate("shizuku") }
+                } else if (route == "profiles") {
+                    ModProfilesScreen(profilesState, profilesModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -190,7 +202,7 @@ fun MelKitApp() {
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (route) {
-                            "home" -> HomeScreen(navigate, libraryState.connected)
+                            "home" -> HomeScreen(navigate, libraryState.connected, profilesState, profilesModel, libraryModel)
                             "share" -> ShareScreen(navigate)
                             "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
                             "settings" -> SettingsScreen()
@@ -208,7 +220,14 @@ fun MelKitApp() {
 }
 
 @Composable
-private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean) {
+private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean, profiles: ModProfilesState,
+    profilesModel: ModProfilesViewModel, library: GameLibraryViewModel) {
+    LaunchedEffect(connected) {
+        if (connected) {
+            val ready = library.state.first { !it.busy || !it.connected }
+            if (ready.connected) profilesModel.refresh(library)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.dashboard), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         MutedText(R.string.tagline)
@@ -242,7 +261,14 @@ private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean) {
         }
     }
     SectionLabel(R.string.current_profile)
-    EmptySummary(R.string.no_profile, R.string.manage, Icons.Outlined.Layers) { navigate("profiles") }
+    val profileSummary = when {
+        !connected -> stringResource(R.string.profile_home_connect)
+        profiles.busy -> stringResource(R.string.library_working)
+        profiles.recovery -> stringResource(R.string.profile_recovery_body)
+        !profiles.loaded || profiles.issue != null -> stringResource(R.string.profile_home_check)
+        else -> profiles.items.firstOrNull { it.active }?.name ?: stringResource(R.string.no_profile)
+    }
+    EmptySummary(R.string.no_profile, R.string.manage, Icons.Outlined.Layers, text = profileSummary) { navigate("profiles") }
     SectionLabel(R.string.last_backup)
     EmptySummary(R.string.no_backup, R.string.view, Icons.Outlined.Archive) { navigate("backups") }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
@@ -282,12 +308,12 @@ private fun ActionCard(title: Int, subtitle: Int, icon: ImageVector, onClick: ()
 }
 
 @Composable
-private fun EmptySummary(title: Int, action: Int, icon: ImageVector, onClick: () -> Unit) {
+private fun EmptySummary(title: Int, action: Int, icon: ImageVector, text: String? = null, onClick: () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(icon, null, tint = MelkitMint, modifier = Modifier.size(28.dp))
-            Text(stringResource(title), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Text(text ?: stringResource(title), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = onClick) { Text(stringResource(action)) }
         }
     }
@@ -327,7 +353,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
     if (selected == 0) {
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
-            ToolCard(feature.title, feature.description, feature.icon, planned = feature.route != "toggles") { navigate(feature.route) }
+            ToolCard(feature.title, feature.description, feature.icon, planned = feature.route !in listOf("toggles", "profiles")) { navigate(feature.route) }
         }
     } else {
         MoreAppsScreen()

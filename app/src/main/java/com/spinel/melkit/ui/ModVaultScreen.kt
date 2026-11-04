@@ -25,11 +25,13 @@ import androidx.compose.ui.unit.dp
 import com.spinel.melkit.R
 import com.spinel.melkit.storage.*
 import kotlinx.coroutines.flow.first
+import java.text.NumberFormat
 
 @Composable
 fun ModVaultScreen(state: ModVaultState, model: ModVaultViewModel, library: GameLibraryViewModel,
     connection: GameLibraryState, guide: () -> Unit) {
     val context = LocalContext.current
+    val number = NumberFormat.getIntegerInstance(context.resources.configuration.locales[0])
     val busy = state.busy || connection.busy
     LaunchedEffect(connection.connected) {
         if (connection.connected) {
@@ -37,76 +39,85 @@ fun ModVaultScreen(state: ModVaultState, model: ModVaultViewModel, library: Game
             if (ready.connected) model.refresh(library)
         }
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.toggler), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.vault_body))
-                Text(stringResource(R.string.vault_location), style = MaterialTheme.typography.bodySmall)
-                if (!connection.connected) Text(stringResource(R.string.saved_connect_help))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(enabled = !busy, onClick = {
-                        if (connection.connected) model.refresh(library) else library.connect()
-                    }) { Text(stringResource(if (connection.connected) R.string.library_refresh else R.string.library_connect)) }
-                    if (!connection.connected) TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
+    Column(Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = state.tab, containerColor = MelkitBackground, contentColor = MelkitMint) {
+            listOf(R.string.vault_active_tab, R.string.vault_disabled_tab).forEachIndexed { index, label ->
+                Tab(selected = state.tab == index, enabled = !busy, onClick = { model.selectTab(library, index) },
+                    text = { Text(stringResource(label) + " (" + number.format(if (index == 0) state.activeCount else state.disabledCount) + ")") })
+            }
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(stringResource(R.string.toggler), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.vault_body))
+                    Text(stringResource(R.string.vault_location), style = MaterialTheme.typography.bodySmall)
+                    if (!connection.connected) Text(stringResource(R.string.saved_connect_help))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilledTonalButton(enabled = !busy, onClick = {
+                            if (connection.connected) model.refresh(library) else library.connect()
+                        }) { Text(stringResource(if (connection.connected) R.string.library_refresh else R.string.library_connect)) }
+                        if (!connection.connected) TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
+                    }
+                    if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 }
-                if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
             }
-        }
-        state.issue?.let { issue -> item {
-            Text(stringResource(when (issue) {
-                "exists" -> R.string.vault_conflict
-                "changed" -> R.string.vault_changed
-                "space" -> R.string.vault_space
-                "connect" -> R.string.saved_connect_help
-                "busy" -> R.string.library_working
-                "incomplete" -> R.string.vault_incomplete
-                else -> R.string.vault_read_error
-            }), color = MaterialTheme.colorScheme.error)
-        } }
-        if (state.warnings > 0) item { Text(stringResource(R.string.vault_warning), color = MaterialTheme.colorScheme.error) }
-        state.result?.let { result -> item {
-            Text(stringResource(if (result == "enabled") R.string.vault_enabled_done else R.string.vault_disabled_done), color = MelkitMint)
-        } }
-        if (state.loaded && state.entries.isEmpty() && state.issue == null && connection.connected && !busy) item {
-            Text(stringResource(R.string.vault_empty))
-        }
-        items(state.entries, key = { if (it.id.isEmpty()) "active:${it.path}" else it.id }) { entry ->
-            val preview by produceState<Bitmap?>(null, entry, state.revision, connection.connected) {
-                if (connection.connected) value = library.previewMod(entry, state.revision)
+            state.issue?.let { issue -> item {
+                Text(stringResource(when (issue) {
+                    "exists" -> R.string.vault_conflict
+                    "changed" -> R.string.vault_changed
+                    "space" -> R.string.vault_space
+                    "connect" -> R.string.saved_connect_help
+                    "busy" -> R.string.library_working
+                    "incomplete" -> R.string.vault_incomplete
+                    "recovery" -> R.string.profile_recovery_body
+                    else -> R.string.vault_read_error
+                }), color = MaterialTheme.colorScheme.error)
+            } }
+            if (state.warnings > 0) item { Text(stringResource(R.string.vault_warning), color = MaterialTheme.colorScheme.error) }
+            state.result?.let { result -> item {
+                Text(stringResource(if (result == "enabled") R.string.vault_enabled_done else R.string.vault_disabled_done), color = MelkitMint)
+            } }
+            if (state.loaded && state.entries.isEmpty() && state.issue == null && connection.connected && !busy) item {
+                Text(stringResource(if (state.tab == 0) R.string.vault_active_empty else R.string.vault_disabled_empty))
             }
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                            val image = preview
-                            if (image != null) Image(image.asImageBitmap(), null, Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit, filterQuality = FilterQuality.None)
-                            else Icon(Icons.Outlined.Tune, null, tint = MelkitMint)
+            items(state.entries, key = { if (it.id.isEmpty()) "active:${it.path}" else it.id }) { entry ->
+                val preview by produceState<Bitmap?>(null, entry, state.revision, connection.connected) {
+                    if (connection.connected) value = library.previewMod(entry, state.revision)
+                }
+                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                                val image = preview
+                                if (image != null) Image(image.asImageBitmap(), null, Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit, filterQuality = FilterQuality.None)
+                                else Icon(Icons.Outlined.Tune, null, tint = MelkitMint)
+                            }
+                            Text(entry.name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.ContentOrLtr))
                         }
-                        Text(entry.name, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.ContentOrLtr))
-                    }
-                    Text(stringResource(when (entry.status) {
-                        "active" -> R.string.vault_active
-                        "disabled" -> R.string.vault_disabled
-                        else -> R.string.vault_recovery
-                    }))
-                    Text(Formatter.formatFileSize(context, entry.bytes))
-                    Text(entry.path, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr))
-                    FilledTonalButton(enabled = connection.connected && !busy, onClick = { model.request(entry) }) {
-                        Text(stringResource(if (entry.id.isEmpty()) R.string.vault_disable else R.string.vault_enable))
+                        Text(stringResource(when (entry.status) {
+                            "active" -> R.string.vault_active
+                            "disabled" -> R.string.vault_disabled
+                            else -> R.string.vault_recovery
+                        }))
+                        Text(Formatter.formatFileSize(context, entry.bytes))
+                        Text(entry.path, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr))
+                        FilledTonalButton(enabled = connection.connected && !busy, onClick = { model.request(entry) }) {
+                            Text(stringResource(if (entry.id.isEmpty()) R.string.vault_disable else R.string.vault_enable))
+                        }
                     }
                 }
             }
-        }
-        if (state.offset > 0 || state.hasNext) item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(enabled = !busy && connection.connected && state.offset > 0,
-                    onClick = { model.refresh(library, (state.offset - 40).coerceAtLeast(0)) }) { Text(stringResource(R.string.library_previous)) }
-                TextButton(enabled = !busy && connection.connected && state.hasNext,
-                    onClick = { model.refresh(library, state.offset + 40) }) { Text(stringResource(R.string.library_next)) }
+            if (state.offset > 0 || state.hasNext) item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(enabled = !busy && connection.connected && state.offset > 0,
+                        onClick = { model.refresh(library, (state.offset - 40).coerceAtLeast(0)) }) { Text(stringResource(R.string.library_previous)) }
+                    TextButton(enabled = !busy && connection.connected && state.hasNext,
+                        onClick = { model.refresh(library, state.offset + 40) }) { Text(stringResource(R.string.library_next)) }
+                }
             }
         }
     }

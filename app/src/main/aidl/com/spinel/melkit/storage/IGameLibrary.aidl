@@ -11,10 +11,11 @@ interface IGameLibrary {
     byte[] readPreview(String storageRoot, String relativePath) = 4;
     String restoreFile(String storageRoot, String relativePath, in ParcelFileDescriptor source,
         long expectedBytes, String expectedSha) = 5;
-    String listMods(String storageRoot, int offset) = 6;
+    String listMods(String storageRoot, int offset, int filter) = 6;
     String toggleMod(String storageRoot, String relativePath, String vaultId, boolean enable,
         long expectedBytes, long expectedModified) = 7;
     byte[] readModPreview(String storageRoot, String relativePath, String vaultId) = 8;
+    String profiles(String storageRoot, String action, String payload) = 9;
 }
 
 

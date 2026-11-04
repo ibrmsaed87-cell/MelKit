@@ -32,7 +32,7 @@
     <string name="last_backup">Latest backup</string>
     <string name="no_backup">No backup yet</string>
     <string name="view">View</string>
-    <string name="preview_notice">Access preview: the library can read game files and save a verified copy. Backup restore, mod switches, and phone transfer are still in preparation.</string>
+    <string name="preview_notice">Browse, save and restore game content, toggle mods and switch groups. Phone transfer and file checks are still in preparation.</string>
     <string name="in_preparation">In preparation</string>
     <string name="library_description">Browse mods, maps, and saves with search, sorting, and multiple selection.</string>
     <string name="library_empty">Your content will appear here</string>
@@ -160,6 +160,47 @@
     <string name="vault_incomplete">The operation did not finish. Reconnect Shizuku and refresh the list. Check the game and vault states before retrying; existing vault copies are retained.</string>
     <string name="vault_read_error">Could not read the mod list. Check access through Shizuku and refresh. This does not mean the mods are damaged.</string>
     <string name="vault_warning">Some vault records could not be read or are incomplete. They were kept without changes. Other available copies are shown below.</string>
+    <string name="vault_active_tab">Active mods</string>
+    <string name="vault_disabled_tab">Disabled mods</string>
+    <string name="vault_active_empty">No active mods. You can return a mod from the Disabled mods tab.</string>
+    <string name="vault_disabled_empty">No disabled mods in the vault.</string>
+    <string name="profile_body">Create groups of mods and switch between them. One group is active at a time; your core mods are included with every group. Close the game before switching.</string>
+    <string name="profile_core">Core mods</string>
+    <string name="profile_core_body">Choose mods to include with every group. Saving this list does not move files; core mods are enabled when you next activate a group.</string>
+    <string name="profile_new">New group</string>
+    <string name="profile_name">Group name</string>
+    <string name="profile_search">Search mods</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_selected_count">Selected: %1$d</string>
+    <string name="profile_core_count">Core mods (%1$d)</string>
+    <string name="profile_member_count">Mods in this group: %1$d</string>
+    <string name="profile_active">Active</string>
+    <string name="profile_apply">Activate group</string>
+    <string name="profile_edit">Edit</string>
+    <string name="profile_delete">Delete group</string>
+    <string name="profile_empty">No groups yet. Create a group and choose its mods.</string>
+    <string name="profile_no_choices">No matching mods. Add content to the game or return to the full list.</string>
+    <string name="profile_unavailable">Not currently available. Remove it from the selection or restore its copy before activating the group.</string>
+    <string name="profile_undo">Undo last switch</string>
+    <string name="profile_recover">Restore previous state</string>
+    <string name="profile_working">Working… Keep the game closed until the operation finishes.</string>
+    <string name="profile_apply_confirm">Close Melon Sandbox completely. This group and your core mods will be enabled; other active mods will move to the vault. An empty group leaves only core mods active. The current state will be saved for undo.</string>
+    <string name="profile_undo_confirm">Close Melon Sandbox completely. Restore the mod state from before the last group switch. Undo stops if a new or modified file would be affected.</string>
+    <string name="profile_delete_confirm">Delete this group definition? Game files and vault copies will stay as they are.</string>
+    <string name="profile_applied">Group activated. Restart the game to use its mods.</string>
+    <string name="profile_undone">The previous mod state was restored. Restart the game.</string>
+    <string name="profile_saved">Saved. Activate a group when you are ready to change the game mods.</string>
+    <string name="profile_deleted">Group deleted. Mod files were kept.</string>
+    <string name="profile_recovery_body">A group switch did not finish. Open Mod groups and use Restore previous state before changing mods again.</string>
+    <string name="profile_vault_warning">Some vault records are unreadable or incomplete and were retained. A group cannot activate a missing or unverified copy.</string>
+    <string name="profile_rolled_back">The switch did not finish. The previous mod state was restored.</string>
+    <string name="profile_missing">A selected mod is unavailable. Restore its copy or edit the group or core-mod list.</string>
+    <string name="profile_changed">The mod state changed after the saved switch. The operation stopped to preserve your files. Refresh the list and review the current mods.</string>
+    <string name="profile_conflict">Different copies of the same mod are available. Enable the version you want from the mod tool first, then retry the group.</string>
+    <string name="profile_limit">This selection is too large. Use fewer mods or shorter paths and try again.</string>
+    <string name="profile_error">Could not complete the operation. Reconnect Shizuku and refresh the groups. Check whether Restore previous state is available before retrying.</string>
+    <string name="profile_home_connect">Connect Shizuku to check the current group.</string>
+    <string name="profile_home_check">Open groups to check the current state.</string>
 </resources>
 
 

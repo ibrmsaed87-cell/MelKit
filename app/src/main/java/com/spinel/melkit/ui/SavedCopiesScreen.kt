@@ -84,6 +84,7 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
                         "partial" -> R.string.saved_partial
                         "connect" -> R.string.library_start_shizuku
                         "busy" -> R.string.library_working
+                        "recovery" -> R.string.profile_recovery_body
                         else -> R.string.saved_restore_error
                     }), color = MaterialTheme.colorScheme.error)
                     if (issue == "permission" && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -150,3 +151,4 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
             confirmButton = { TextButton(onClick = model::dismissResult) { Text(stringResource(R.string.library_done)) } })
     }
 }
+

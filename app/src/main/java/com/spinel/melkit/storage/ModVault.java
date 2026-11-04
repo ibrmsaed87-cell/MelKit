@@ -226,6 +226,23 @@ public final class ModVault {
         return file;
     }
 
+    public void validateModPath(String path) throws IOException { mod(path); }
+
+    /** Fingerprints are checked against fresh metadata before a batch touches a file. */
+    public String fingerprint(Item item) throws Exception {
+        if (!item.id.isEmpty()) {
+            Record r = read(item.id);
+            if (!r.path.equals(item.path)) throw new Changed();
+            verify(child(item.id, "content.melmod"), r);
+            return r.hash;
+        }
+        File file = mod(item.path);
+        if (!file.isFile() || file.length() != item.bytes || file.lastModified() != item.modified) throw new Changed();
+        String result = hash(file);
+        if (file.length() != item.bytes || file.lastModified() != item.modified) throw new Changed();
+        return result;
+    }
+
     private static void verify(File file, Record r) throws Exception {
         if (!file.isFile() || file.length() != r.bytes || !hash(file).equals(r.hash)) throw new Changed();
     }

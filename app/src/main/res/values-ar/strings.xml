@@ -28,7 +28,7 @@
     <string name="last_backup">آخر نسخة احتياطية</string>
     <string name="no_backup">لا توجد نسخة احتياطية بعد</string>
     <string name="view">عرض</string>
-    <string name="preview_notice">نسخة لاختبار الوصول: تقرأ المكتبة ملفات اللعبة وتحفظ نسخة موثّقة. الاستعادة وتفعيل المودات والمشاركة بين الهاتفين قيد التجهيز.</string>
+    <string name="preview_notice">تصفّح محتوى اللعبة واحفظه واستعده، وتحكّم بالمودات وبدّل مجموعاتها. المشاركة بين الهاتفين وفحص الملفات قيد التجهيز.</string>
     <string name="in_preparation">قيد التجهيز</string>
     <string name="library_description">تصفّح المودات والخرائط وملفات الحفظ مع البحث والفرز والتحديد المتعدد.</string>
     <string name="library_empty">سيظهر محتواك هنا</string>
@@ -153,6 +153,47 @@
     <string name="vault_incomplete">لم تكتمل العملية. أعد ربط Shizuku وحدّث القائمة. راجع حالة المود داخل اللعبة والخزنة قبل المحاولة مجددًا؛ تبقى نسخ الخزنة الموجودة محفوظة.</string>
     <string name="vault_read_error">تعذرت قراءة قائمة المودات. تحقق من الوصول عبر Shizuku وحدّث القائمة. هذا لا يعني أن المودات تالفة.</string>
     <string name="vault_warning">تعذرت قراءة بعض سجلات الخزنة أو لم تكتمل. أُبقيت دون تغيير. تظهر النسخ الأخرى المتاحة أدناه.</string>
+    <string name="vault_active_tab">المودات الفعّالة</string>
+    <string name="vault_disabled_tab">المودات المعطّلة</string>
+    <string name="vault_active_empty">لا توجد مودات فعّالة. يمكنك إعادة مود من تبويب المودات المعطّلة.</string>
+    <string name="vault_disabled_empty">لا توجد مودات معطّلة في الخزنة.</string>
+    <string name="profile_body">أنشئ مجموعات للمودات وبدّل بينها. تُفعّل مجموعة واحدة في كل مرة، وتُضم إليها موداتك الأساسية دائمًا. أغلق اللعبة قبل التبديل.</string>
+    <string name="profile_core">المودات الأساسية</string>
+    <string name="profile_core_body">اختر المودات التي تُضم إلى كل مجموعة. حفظ القائمة لا ينقل ملفات؛ تُفعّل المودات الأساسية عند تفعيل مجموعة لاحقًا.</string>
+    <string name="profile_new">مجموعة جديدة</string>
+    <string name="profile_name">اسم المجموعة</string>
+    <string name="profile_search">البحث عن مود</string>
+    <string name="profile_save">حفظ</string>
+    <string name="profile_selected_count">المحدد: %1$d</string>
+    <string name="profile_core_count">المودات الأساسية (%1$d)</string>
+    <string name="profile_member_count">مودات المجموعة: %1$d</string>
+    <string name="profile_active">فعّالة</string>
+    <string name="profile_apply">تفعيل المجموعة</string>
+    <string name="profile_edit">تعديل</string>
+    <string name="profile_delete">حذف المجموعة</string>
+    <string name="profile_empty">لا توجد مجموعات بعد. أنشئ مجموعة واختر موداتها.</string>
+    <string name="profile_no_choices">لا توجد مودات مطابقة. أضف محتوى إلى اللعبة أو ارجع إلى القائمة الكاملة.</string>
+    <string name="profile_unavailable">غير متاح حاليًا. أزله من التحديد أو استعد نسخته قبل تفعيل المجموعة.</string>
+    <string name="profile_undo">التراجع عن آخر تبديل</string>
+    <string name="profile_recover">استعادة الحالة السابقة</string>
+    <string name="profile_working">جارٍ العمل… أبقِ اللعبة مغلقة حتى اكتمال العملية.</string>
+    <string name="profile_apply_confirm">أغلق Melon Sandbox بالكامل. ستُفعّل هذه المجموعة والمودات الأساسية، وتُنقل المودات الفعّالة الأخرى إلى الخزنة. المجموعة الفارغة تُبقي المودات الأساسية فقط. ستُحفظ الحالة الحالية للتراجع.</string>
+    <string name="profile_undo_confirm">أغلق Melon Sandbox بالكامل. ستُعاد حالة المودات التي سبقت آخر تبديل للمجموعة. يتوقف التراجع إذا كان سيؤثر في ملف جديد أو متغيّر.</string>
+    <string name="profile_delete_confirm">هل تريد حذف تعريف هذه المجموعة؟ تبقى ملفات اللعبة ونسخ الخزنة كما هي.</string>
+    <string name="profile_applied">تم تفعيل المجموعة. أعد تشغيل اللعبة لاستخدام موداتها.</string>
+    <string name="profile_undone">تمت استعادة حالة المودات السابقة. أعد تشغيل اللعبة.</string>
+    <string name="profile_saved">تم الحفظ. فعّل مجموعة عندما تريد تغيير مودات اللعبة.</string>
+    <string name="profile_deleted">تم حذف المجموعة مع الاحتفاظ بملفات المودات.</string>
+    <string name="profile_recovery_body">لم يكتمل تبديل مجموعة. افتح مجموعات المودات واضغط استعادة الحالة السابقة قبل تغيير المودات مجددًا.</string>
+    <string name="profile_vault_warning">تعذرت قراءة بعض سجلات الخزنة أو لم تكتمل، وأُبقيت محفوظة. لا يمكن للمجموعة تفعيل نسخة مفقودة أو غير موثّقة.</string>
+    <string name="profile_rolled_back">لم يكتمل التبديل، وأُعيدت حالة المودات السابقة.</string>
+    <string name="profile_missing">أحد المودات المحددة غير متاح. استعد نسخته أو عدّل المجموعة أو قائمة المودات الأساسية.</string>
+    <string name="profile_changed">تغيّرت حالة المودات بعد التبديل المحفوظ. توقفت العملية للحفاظ على ملفاتك. حدّث القائمة وراجع المودات الحالية.</string>
+    <string name="profile_conflict">توجد نسخ مختلفة للمود نفسه. فعّل النسخة المطلوبة من أداة المودات أولًا، ثم أعد محاولة تفعيل المجموعة.</string>
+    <string name="profile_limit">هذا التحديد كبير جدًا. استخدم مودات أقل أو مسارات أقصر ثم أعد المحاولة.</string>
+    <string name="profile_error">تعذّر إكمال العملية. أعد ربط Shizuku وحدّث المجموعات. تحقق من توفر استعادة الحالة السابقة قبل المحاولة مجددًا.</string>
+    <string name="profile_home_connect">اربط Shizuku للتحقق من المجموعة الحالية.</string>
+    <string name="profile_home_check">افتح المجموعات للتحقق من الحالة الحالية.</string>
 </resources>
 
 

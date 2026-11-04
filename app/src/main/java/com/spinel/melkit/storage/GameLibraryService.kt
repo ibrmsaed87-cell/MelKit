@@ -1,6 +1,7 @@
 package com.spinel.melkit.storage
 
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
@@ -9,10 +10,15 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.Locale
+import java.util.UUID
 import kotlin.system.exitProcess
 
 /** Scoped game access in Shizuku's dedicated process. */
 class GameLibraryService : IGameLibrary.Stub() {
+    private var choiceToken = ""
+    private var choiceRoot = ""
+    private var choiceStarted = 0L
+    private var choiceSnapshot: List<ModVault.Item> = emptyList()
     override fun destroy() { exitProcess(0) }
 
     private fun paths(storageRoot: String): ContentPaths {
@@ -65,8 +71,13 @@ class GameLibraryService : IGameLibrary.Stub() {
             try {
                 val policy = paths(storageRoot)
                 policy.resolve(relativePath, false)
+                if (relativePath.startsWith("Mods/", ignoreCase = true)) {
+                    ModProfiles(vault(storageRoot), File(File(storageRoot).canonicalFile, "Download/MelKit/ModProfiles")).requireIdle()
+                }
                 NewFileRestore.restore(policy.resolve("", true), relativePath, input, expectedBytes, expectedSha)
                 JSONObject().put("status", "ok").toString()
+            } catch (_: ModProfiles.NeedsRecovery) {
+                JSONObject().put("status", "recovery").toString()
             } catch (_: NewFileRestore.AlreadyExists) {
                 JSONObject().put("status", "exists").toString()
             } catch (_: NewFileRestore.SourceChanged) {
@@ -101,17 +112,83 @@ class GameLibraryService : IGameLibrary.Stub() {
     }
 
     @Synchronized
-    override fun listMods(storageRoot: String, offset: Int): String = response {
-        require(offset >= 0)
+    override fun listMods(storageRoot: String, offset: Int, filter: Int): String = response {
+        require(offset >= 0 && filter in 0..2)
         val snapshot = vault(storageRoot).list()
+        val activeCount = snapshot.items.count { it.id.isEmpty() }
+        val filtered = snapshot.items.filter { filter == 0 || (if (filter == 1) it.id.isEmpty() else it.id.isNotEmpty()) }
         val entries = JSONArray()
-        snapshot.items.drop(offset).take(PAGE_SIZE).forEach { item ->
+        filtered.drop(offset).take(PAGE_SIZE).forEach { item ->
             entries.put(JSONObject().put("id", item.id).put("path", item.path)
                 .put("name", item.path.substringAfterLast('/')).put("state", item.state)
                 .put("size", item.bytes).put("modified", item.modified))
         }
-        JSONObject().put("entries", entries).put("total", snapshot.items.size)
-            .put("warnings", snapshot.warnings).put("next", offset + entries.length() < snapshot.items.size)
+        JSONObject().put("entries", entries).put("total", filtered.size)
+            .put("active", activeCount).put("disabled", snapshot.items.size - activeCount)
+            .put("warnings", snapshot.warnings).put("next", offset + entries.length() < filtered.size)
+    }
+
+    @Synchronized
+    override fun profiles(storageRoot: String, action: String, payload: String): String {
+        return try {
+            require(payload.toByteArray(Charsets.UTF_8).size <= 400_000)
+            val manager = ModProfiles(vault(storageRoot), File(File(storageRoot).canonicalFile, "Download/MelKit/ModProfiles"))
+            val request = JSONObject(payload)
+            val result = when (action) {
+                "state" -> {
+                    val state = manager.state()
+                    val items = JSONArray()
+                    state.profiles.forEach { profile ->
+                        items.put(JSONObject().put("id", profile.id).put("name", profile.name)
+                            .put("count", profile.paths.size).put("active", profile.id == state.activeId))
+                    }
+                    JSONObject().put("items", items).put("core", state.core.size)
+                        .put("undo", state.undo).put("recovery", state.recovery).put("warnings", state.warnings)
+                }
+                "editor" -> {
+                    val profile = manager.profile(request.optString("id"))
+                    choiceSnapshot = vault(storageRoot).list().items.distinctBy { it.path }
+                    choiceToken = UUID.randomUUID().toString()
+                    choiceRoot = storageRoot
+                    choiceStarted = SystemClock.elapsedRealtime()
+                    choices(0).put("id", profile.id).put("name", profile.name)
+                        .put("paths", JSONArray(profile.paths.toList())).put("token", choiceToken)
+                }
+                "choices" -> {
+                    require(choiceToken.isNotEmpty() && choiceRoot == storageRoot && request.getString("token") == choiceToken)
+                    require(SystemClock.elapsedRealtime() - choiceStarted < 300_000)
+                    val offset = request.getInt("offset")
+                    require(offset >= 0)
+                    choices(offset)
+                }
+                "save" -> {
+                    val array = request.getJSONArray("paths")
+                    require(array.length() <= 5000)
+                    val selected = (0 until array.length()).map { array.getString(it) }.toSet()
+                    JSONObject().put("id", manager.saveProfile(request.optString("id"), request.optString("name"), selected))
+                }
+                "delete" -> { manager.delete(request.getString("id")); JSONObject() }
+                "apply" -> { manager.apply(request.getString("id")); JSONObject() }
+                "undo" -> { manager.undo(); JSONObject() }
+                else -> throw IllegalArgumentException("Unknown profile operation")
+            }
+            val response = result.put("status", "ok").toString()
+            if (response.toByteArray(Charsets.UTF_8).size > 400_000) JSONObject().put("status", "limit").toString() else response
+        } catch (_: ModProfiles.NeedsRecovery) { JSONObject().put("status", "recovery").toString()
+        } catch (_: ModProfiles.MissingMod) { JSONObject().put("status", "missing_mod").toString()
+        } catch (_: ModProfiles.RolledBack) { JSONObject().put("status", "rolled_back").toString()
+        } catch (_: ModProfiles.Limit) { JSONObject().put("status", "limit").toString()
+        } catch (_: ModVault.Changed) { JSONObject().put("status", "changed").toString()
+        } catch (_: ModVault.Conflict) { JSONObject().put("status", "exists").toString()
+        } catch (_: Exception) { JSONObject().put("status", "incomplete").toString() }
+    }
+
+    private fun choices(offset: Int): JSONObject {
+        val entries = JSONArray()
+        choiceSnapshot.drop(offset).take(PAGE_SIZE).forEach { item ->
+            entries.put(JSONObject().put("path", item.path).put("name", item.path.substringAfterLast('/')))
+        }
+        return JSONObject().put("entries", entries).put("next", offset + entries.length() < choiceSnapshot.size)
     }
 
     @Synchronized
@@ -119,8 +196,10 @@ class GameLibraryService : IGameLibrary.Stub() {
         expectedBytes: Long, expectedModified: Long): String {
         val status = try {
             val manager = vault(storageRoot)
+            ModProfiles(manager, File(File(storageRoot).canonicalFile, "Download/MelKit/ModProfiles")).requireIdle()
             if (enable) manager.enable(vaultId) else manager.disable(relativePath, expectedBytes, expectedModified)
             "ok"
+        } catch (_: ModProfiles.NeedsRecovery) { "recovery"
         } catch (_: ModVault.Conflict) { "exists"
         } catch (_: NewFileRestore.AlreadyExists) { "exists"
         } catch (_: ModVault.Changed) { "changed"
