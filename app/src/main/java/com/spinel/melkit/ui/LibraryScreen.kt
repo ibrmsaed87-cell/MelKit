@@ -104,7 +104,8 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(if (state.connected) R.string.library_connected else R.string.library_connect_title),
                         fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.library_connect_body), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(if (state.connected) R.string.library_ready_body else R.string.library_connect_body),
+                        style = MaterialTheme.typography.bodyMedium)
                     FilledTonalButton(onClick = model::connect, enabled = !state.busy) {
                         if (state.busy) CircularProgressIndicator(Modifier.padding(end = 8.dp).size(18.dp), strokeWidth = 2.dp)
                         Text(stringResource(when {
@@ -297,4 +298,5 @@ private fun openShizuku(context: Context) {
         Toast.makeText(context, R.string.library_shizuku_not_installed, Toast.LENGTH_LONG).show()
     }
 }
+
 

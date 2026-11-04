@@ -7,9 +7,12 @@ javac -encoding UTF-8 -d "$melkit_test_dir" \
   app/src/main/java/com/spinel/melkit/storage/ExportPaths.java \
   app/src/main/java/com/spinel/melkit/storage/PreviewImages.java \
   app/src/main/java/com/spinel/melkit/storage/NewFileRestore.java \
-  tests/ContentPathsCheck.java tests/ExportPathsCheck.java tests/PreviewImagesCheck.java tests/RestoreCheck.java
+  app/src/main/java/com/spinel/melkit/storage/ModVault.java \
+  tests/ContentPathsCheck.java tests/ExportPathsCheck.java tests/PreviewImagesCheck.java tests/RestoreCheck.java tests/ModVaultCheck.java
 java -cp "$melkit_test_dir" ContentPathsCheck
 java -cp "$melkit_test_dir" ExportPathsCheck
 java -cp "$melkit_test_dir" PreviewImagesCheck
 java -cp "$melkit_test_dir" RestoreCheck
+java -cp "$melkit_test_dir" ModVaultCheck
+
 

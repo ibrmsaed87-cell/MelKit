@@ -89,6 +89,7 @@ import com.spinel.melkit.BuildConfig
 import com.spinel.melkit.R
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.SavedCopiesViewModel
+import com.spinel.melkit.storage.ModVaultViewModel
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
 private data class Feature(val route: String, val title: Int, val description: Int, val icon: ImageVector)
@@ -118,6 +119,8 @@ fun MelKitApp() {
     val libraryState by libraryModel.state.collectAsState()
     val savedModel: SavedCopiesViewModel = viewModel()
     val savedState by savedModel.state.collectAsState()
+    val vaultModel: ModVaultViewModel = viewModel()
+    val vaultState by vaultModel.state.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -178,6 +181,8 @@ fun MelKitApp() {
                     LibraryScreen(libraryState, libraryModel) { navigate("shizuku") }
                 } else if (route == "backups") {
                     SavedCopiesScreen(savedState, savedModel, libraryModel, libraryState)
+                } else if (route == "toggles") {
+                    ModVaultScreen(vaultState, vaultModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -322,7 +327,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
     if (selected == 0) {
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
-            ToolCard(feature.title, feature.description, feature.icon) { navigate(feature.route) }
+            ToolCard(feature.title, feature.description, feature.icon, planned = feature.route != "toggles") { navigate(feature.route) }
         }
     } else {
         MoreAppsScreen()
@@ -330,7 +335,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
 }
 
 @Composable
-private fun ToolCard(title: Int, description: Int, icon: ImageVector, onClick: () -> Unit) {
+private fun ToolCard(title: Int, description: Int, icon: ImageVector, planned: Boolean = false, onClick: () -> Unit) {
     Card(onClick = onClick, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
         Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -338,6 +343,8 @@ private fun ToolCard(title: Int, description: Int, icon: ImageVector, onClick: (
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(stringResource(title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 MutedText(description)
+                if (planned) Text(stringResource(R.string.in_preparation),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -434,4 +441,5 @@ private fun openExternal(context: Context, url: String) {
         Toast.makeText(context, R.string.open_link_error, Toast.LENGTH_SHORT).show()
     }
 }
+
 

@@ -94,6 +94,51 @@ class GameLibraryService : IGameLibrary.Stub() {
             .put("size", stat.st_size).put("modified", stat.st_mtime * 1000L).put("type", type)
     }
 
+    private fun vault(storageRoot: String): ModVault {
+        val root = paths(storageRoot).resolve("", true)
+        check(OsConstants.S_ISDIR(Os.stat(root.path).st_mode))
+        return ModVault(root, File(File(storageRoot).canonicalFile, "Download/MelKit/DisabledMods"))
+    }
+
+    @Synchronized
+    override fun listMods(storageRoot: String, offset: Int): String = response {
+        require(offset >= 0)
+        val snapshot = vault(storageRoot).list()
+        val entries = JSONArray()
+        snapshot.items.drop(offset).take(PAGE_SIZE).forEach { item ->
+            entries.put(JSONObject().put("id", item.id).put("path", item.path)
+                .put("name", item.path.substringAfterLast('/')).put("state", item.state)
+                .put("size", item.bytes).put("modified", item.modified))
+        }
+        JSONObject().put("entries", entries).put("total", snapshot.items.size)
+            .put("warnings", snapshot.warnings).put("next", offset + entries.length() < snapshot.items.size)
+    }
+
+    @Synchronized
+    override fun toggleMod(storageRoot: String, relativePath: String, vaultId: String, enable: Boolean,
+        expectedBytes: Long, expectedModified: Long): String {
+        val status = try {
+            val manager = vault(storageRoot)
+            if (enable) manager.enable(vaultId) else manager.disable(relativePath, expectedBytes, expectedModified)
+            "ok"
+        } catch (_: ModVault.Conflict) { "exists"
+        } catch (_: NewFileRestore.AlreadyExists) { "exists"
+        } catch (_: ModVault.Changed) { "changed"
+        } catch (_: NewFileRestore.SourceChanged) { "changed"
+        } catch (_: ModVault.NoSpace) { "space"
+        } catch (_: Exception) { "incomplete" }
+        return JSONObject().put("status", status).toString()
+    }
+
+    override fun readModPreview(storageRoot: String, relativePath: String, vaultId: String): ByteArray = try {
+        val file = if (vaultId.isNotEmpty()) vault(storageRoot).previewFile(vaultId) else {
+            require(relativePath.startsWith("Mods/") && relativePath.endsWith(".melmod", ignoreCase = true))
+            paths(storageRoot).resolve(relativePath, false)
+        }
+        check(OsConstants.S_ISREG(Os.stat(file.path).st_mode))
+        GamePreviewReader.read(file)
+    } catch (_: Exception) { byteArrayOf() }
+
     private fun response(block: () -> JSONObject): String = try {
         block().put("status", "ok").toString()
     } catch (error: ErrnoException) {
@@ -111,4 +156,5 @@ class GameLibraryService : IGameLibrary.Stub() {
 
     companion object { const val PAGE_SIZE = 40 }
 }
+
 

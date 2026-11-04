@@ -140,5 +140,26 @@
     <string name="saved_partial">The restore did not finish and its new file could not be removed. Check the destination before trying again. The saved copy is unchanged.</string>
     <string name="saved_restored">File restored and verified</string>
     <string name="saved_restored_body">Open Melon Sandbox and check that the restored file appears. Your saved copy remains in Downloads.</string>
+    <string name="library_ready_body">Connection ready. You can browse game files and save a copy.</string>
+    <string name="vault_body">Close the game before changing mods. Disable a mod to keep it in a separate vault, then enable it to return it to its original location.</string>
+    <string name="vault_location">Vault: Download/MelKit/DisabledMods. Safety copies remain after enabling and after uninstalling MelKit. Repeated toggles reuse an unchanged copy.</string>
+    <string name="vault_active">Active in the game</string>
+    <string name="vault_disabled">Disabled — stored in the vault</string>
+    <string name="vault_recovery">Safety copy — return it or confirm the identical mod already in the game</string>
+    <string name="vault_disable">Disable mod</string>
+    <string name="vault_enable">Return to game</string>
+    <string name="vault_empty">No mod files found in the game or disabled vault.</string>
+    <string name="vault_confirm_disable">Close Melon Sandbox completely. MelKit will verify a safety copy before removing this mod from the game folder.</string>
+    <string name="vault_confirm_enable">Close Melon Sandbox completely. The mod will return to its original location. A different existing file will never be replaced.</string>
+    <string name="vault_closed_continue">Game closed — continue</string>
+    <string name="vault_disabled_done">Mod disabled. Its verified copy is in the vault.</string>
+    <string name="vault_enabled_done">Mod returned to the game. Restart the game to use it.</string>
+    <string name="vault_conflict">A different file already exists at the original location. It was not replaced; the vault copy remains available.</string>
+    <string name="vault_changed">The source or vault copy changed. The operation stopped. Refresh the list before trying again.</string>
+    <string name="vault_space">Not enough free storage for a verified copy. Free some space and try again.</string>
+    <string name="vault_incomplete">The operation did not finish. Reconnect Shizuku and refresh the list. Check the game and vault states before retrying; existing vault copies are retained.</string>
+    <string name="vault_read_error">Could not read the mod list. Check access through Shizuku and refresh. This does not mean the mods are damaged.</string>
+    <string name="vault_warning">Some vault records could not be read or are incomplete. They were kept without changes. Other available copies are shown below.</string>
 </resources>
+
 

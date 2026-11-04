@@ -266,6 +266,39 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    suspend fun listMods(offset: Int): JSONObject = modCall { it.listMods(storageRoot, offset) }
+
+    suspend fun toggleMod(entry: VaultMod): JSONObject = modCall {
+        it.toggleMod(storageRoot, entry.path, entry.id, entry.id.isNotEmpty(), entry.bytes, entry.modified)
+    }
+
+    private suspend fun modCall(block: (IGameLibrary) -> String): JSONObject {
+        if (mutableState.value.busy) return JSONObject().put("status", "busy")
+        val service = authorizedService() ?: return JSONObject().put("status", "connect")
+        mutableState.update { it.copy(busy = true, issue = null) }
+        return try { withContext(Dispatchers.IO) { JSONObject(block(service)) } }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { JSONObject().put("status", "incomplete") }
+        finally { mutableState.update { it.copy(busy = false, previewRevision = it.previewRevision + 1) } }
+    }
+
+    suspend fun previewMod(entry: VaultMod, revision: Int): Bitmap? {
+        val key = "mod:$revision:${entry.id}:${entry.path}:${entry.bytes}:${entry.modified}"
+        return previewMutex.withLock {
+            previews.get(key)?.let { return@withLock it.bitmap }
+            val bitmap = withContext(Dispatchers.IO) {
+                try {
+                    val service = remote ?: return@withContext null
+                    if (!service.asBinder().pingBinder()) return@withContext null
+                    PreviewBitmap.decode(service.readModPreview(storageRoot, entry.path, entry.id))
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { null }
+            }
+            previews.put(key, PreviewResult(bitmap))
+            bitmap
+        }
+    }
+
     fun prepareExport(entry: GameEntry): Boolean {
         if (mutableState.value.busy || !mutableState.value.connected || !entry.regular) return false
         if (authorizedService() == null) return false
@@ -405,4 +438,5 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     private class AccessFailure(val issue: LibraryIssue) : IOException()
     companion object { private const val REQUEST_ACCESS = 201 }
 }
+
 

@@ -133,5 +133,26 @@
     <string name="saved_partial">لم تكتمل الاستعادة وتعذر إزالة ملفها الجديد. راجع مكان الاستعادة قبل المحاولة مجددًا. النسخة المحفوظة لم تتغير.</string>
     <string name="saved_restored">تمت استعادة الملف والتحقق منه</string>
     <string name="saved_restored_body">افتح Melon Sandbox وتأكد من ظهور الملف المستعاد. نسختك المحفوظة ما زالت في التنزيلات.</string>
+    <string name="library_ready_body">الاتصال جاهز، يمكنك تصفح ملفات اللعبة وحفظ نسخة منها.</string>
+    <string name="vault_body">أغلق اللعبة قبل تغيير المودات. عطّل المود لحفظه في خزنة منفصلة، ثم أعد تفعيله لإرجاعه إلى مكانه الأصلي.</string>
+    <string name="vault_location">الخزنة: Download/MelKit/DisabledMods. تبقى نسخ الأمان بعد التفعيل وبعد إزالة MelKit. يُعاد استخدام النسخة نفسها عند تكرار التعطيل دون تغيير المود.</string>
+    <string name="vault_active">مفعّل داخل اللعبة</string>
+    <string name="vault_disabled">معطّل — محفوظ في الخزنة</string>
+    <string name="vault_recovery">نسخة أمان — أعدها أو أكّد وجود المود المطابق داخل اللعبة</string>
+    <string name="vault_disable">تعطيل المود</string>
+    <string name="vault_enable">إعادة إلى اللعبة</string>
+    <string name="vault_empty">لم يُعثر على ملفات مودات داخل اللعبة أو في خزنة التعطيل.</string>
+    <string name="vault_confirm_disable">أغلق Melon Sandbox بالكامل. سيتحقق MelKit من نسخة أمان قبل إزالة هذا المود من مجلد اللعبة.</string>
+    <string name="vault_confirm_enable">أغلق Melon Sandbox بالكامل. سيُعاد المود إلى مكانه الأصلي. لن يُستبدل أي ملف مختلف موجود بالاسم نفسه.</string>
+    <string name="vault_closed_continue">أغلقت اللعبة — متابعة</string>
+    <string name="vault_disabled_done">تم تعطيل المود وحفظ نسخته الموثّقة في الخزنة.</string>
+    <string name="vault_enabled_done">تمت إعادة المود إلى اللعبة. أعد تشغيل اللعبة لاستخدامه.</string>
+    <string name="vault_conflict">يوجد ملف مختلف في المكان الأصلي. لم يُستبدل، وتبقى نسخة الخزنة متاحة.</string>
+    <string name="vault_changed">تغيّر المصدر أو نسخة الخزنة، فتوقفت العملية. حدّث القائمة قبل المحاولة مجددًا.</string>
+    <string name="vault_space">لا توجد مساحة كافية لنسخة موثّقة. وفّر مساحة ثم أعد المحاولة.</string>
+    <string name="vault_incomplete">لم تكتمل العملية. أعد ربط Shizuku وحدّث القائمة. راجع حالة المود داخل اللعبة والخزنة قبل المحاولة مجددًا؛ تبقى نسخ الخزنة الموجودة محفوظة.</string>
+    <string name="vault_read_error">تعذرت قراءة قائمة المودات. تحقق من الوصول عبر Shizuku وحدّث القائمة. هذا لا يعني أن المودات تالفة.</string>
+    <string name="vault_warning">تعذرت قراءة بعض سجلات الخزنة أو لم تكتمل. أُبقيت دون تغيير. تظهر النسخ الأخرى المتاحة أدناه.</string>
 </resources>
+
 
