@@ -38,11 +38,12 @@ import com.spinel.melkit.storage.*
 
 @Composable
 internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewModel,
-    connection: GameLibraryState, saved: SavedCopiesViewModel, copies: SavedCopiesState, guide: () -> Unit) {
+    connection: GameLibraryState, saved: SavedCopiesViewModel, copies: SavedCopiesState,
+    bundles: Boolean = false, guide: () -> Unit) {
     val context = LocalContext.current
     val pageState by model.state.collectAsState()
     val transfer by model.transfer.collectAsState()
-    var page by rememberSaveable { mutableStateOf("menu") }
+    var page by rememberSaveable { mutableStateOf(if (bundles) "pick" else "menu") }
     var source by rememberSaveable { mutableStateOf("game") }
     var pending by rememberSaveable { mutableStateOf("") }
     var restore by remember { mutableStateOf<ReceivedFile?>(null) }
@@ -83,6 +84,16 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val documents = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) model.addDocuments(uris)
     }
+    val bundleDestination = if (bundles) {
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+            uri?.let(model::saveBundle)
+        }
+    } else null
+    val bundleSource = if (bundles) {
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let(model::importBundle)
+        }
+    } else null
     val readStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         if (allowed) saved.refresh() else model.issue("STORAGE_PERMISSION")
     }
@@ -92,20 +103,24 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
         if (allowed && file != null) model.save(file) else if (!allowed) model.issue("STORAGE_PERMISSION")
     }
     LaunchedEffect(transfer.phase) {
-        if (transfer.active) page = "transfer"
-        if (transfer.phase == "complete" && !transfer.sending) model.refreshReceived()
+        if (!bundles) {
+            if (transfer.active) page = "transfer"
+            if (transfer.phase == "complete" && !transfer.sending) model.refreshReceived()
+        }
     }
     LaunchedEffect(page) { if (page == "history") model.refreshReceived() }
-    BackHandler(enabled = page != "menu" && !transfer.active) { page = "menu" }
+    BackHandler(enabled = if (bundles) page == "history" else page != "menu" && !transfer.active) {
+        page = if (bundles) "pick" else "menu"
+    }
 
-    val screen = if (transfer.active) "transfer" else page
+    val screen = if (!bundles && transfer.active) "transfer" else page
     key(screen) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Text(stringResource(when (screen) {
-                    "pick" -> R.string.share_choose
-                    "history" -> R.string.share_received_files
+                    "pick" -> if (bundles) R.string.bundle_choose else R.string.share_choose
+                    "history" -> if (bundles) R.string.bundle_contents else R.string.share_received_files
                     "transfer" -> R.string.share_transfer
                     else -> R.string.sharing
                 }), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -113,7 +128,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             if (pageState.busy || (screen == "pick" && source == "game" && connection.busy)) {
                 item { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
             }
-            pageState.issue?.let { error -> item { ShareError(error) } }
+            pageState.issue?.let { error -> item { ShareError(error, bundles) } }
 
             when (screen) {
                 "menu" -> {
@@ -153,8 +168,31 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(stringResource(R.string.share_queue_count, pageState.queue.size))
-                            FilledTonalButton(enabled = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy,
-                                onClick = { begin("send") }) { Text(stringResource(R.string.share_create_qr)) }
+                            val canUseSelection = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy
+                            if (bundles) {
+                                FilledTonalButton(enabled = canUseSelection, onClick = {
+                                    bundleDestination?.launch("MelKit-Bundle.zip")
+                                }) { Text(stringResource(R.string.bundle_create)) }
+                                pageState.bundleUri?.let { uri ->
+                                    Text(stringResource(R.string.bundle_saved), color = MelkitMint)
+                                    TextButton(enabled = !pageState.busy, onClick = { model.shareBundle(context, uri) }) {
+                                        Text(stringResource(R.string.share_other_apps))
+                                    }
+                                }
+                                TextButton(enabled = !pageState.busy, onClick = { bundleSource?.launch(arrayOf("*/*")) }) {
+                                    Text(stringResource(R.string.bundle_import))
+                                }
+                                if (pageState.bundleBatch != null) {
+                                    Text(stringResource(R.string.bundle_verified), color = MelkitMint)
+                                    TextButton(enabled = !pageState.busy, onClick = { page = "history" }) {
+                                        Text(stringResource(R.string.bundle_contents))
+                                    }
+                                }
+                            } else {
+                                FilledTonalButton(enabled = canUseSelection, onClick = { begin("send") }) {
+                                    Text(stringResource(R.string.share_create_qr))
+                                }
+                            }
                             TextButton(enabled = !pageState.busy, onClick = { documents.launch(arrayOf("*/*")) }) {
                                 Text(stringResource(R.string.share_choose_documents))
                             }
@@ -270,6 +308,9 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                     }
                 }
                 "history" -> {
+                    if (bundles) item {
+                        TextButton(onClick = { page = "pick" }) { Text(stringResource(R.string.bundle_choose)) }
+                    }
                     if (pageState.saved || pageState.imported) item {
                         Text(stringResource(if (pageState.imported) R.string.share_imported else R.string.share_saved), color = MelkitMint)
                         if (pageState.imported) TextButton(onClick = { model.openGame(context) }) { Text(stringResource(R.string.share_open_game)) }
@@ -281,8 +322,9 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         }
                         TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
                     }
-                    if (!pageState.busy && pageState.received.isEmpty()) item { Text(stringResource(R.string.share_no_received)) }
-                    items(pageState.received, key = { it.batch + "/" + it.path }) { file ->
+                    val received = if (bundles) pageState.received.filter { it.batch == pageState.bundleBatch } else pageState.received
+                    if (!pageState.busy && received.isEmpty()) item { Text(stringResource(R.string.share_no_received)) }
+                    items(received, key = { it.batch + "/" + it.path }) { file ->
                         ShareCard(null, null) {
                             SharePath(file.path)
                             Text(Formatter.formatFileSize(context, file.bytes))
@@ -344,7 +386,7 @@ private fun ShareCard(title: Int?, description: Int?, body: @Composable ColumnSc
 }
 
 @Composable
-private fun ShareError(code: String) {
+private fun ShareError(code: String, bundles: Boolean = false) {
     val message = when (code) {
         "PERMISSION", "STORAGE_PERMISSION" -> R.string.share_permission
         "WIFI_OFF" -> R.string.share_wifi_off
@@ -354,7 +396,8 @@ private fun ShareError(code: String) {
         "TIMEOUT" -> R.string.share_timeout
         "BAD_QR", "INCOMPATIBLE" -> R.string.share_bad_qr
         "SPACE" -> R.string.vault_space
-        "CHECKSUM" -> R.string.share_checksum
+        "CHECKSUM" -> if (bundles) R.string.bundle_checksum else R.string.share_checksum
+        "INVALID_BUNDLE" -> R.string.bundle_invalid
         "INVALID_FILE", "LIMIT" -> R.string.share_invalid_file
         "DUPLICATE_NAME" -> R.string.share_duplicate_path
         "FILE_CHANGED", "SOURCE_ACCESS" -> R.string.share_source_access
@@ -364,7 +407,7 @@ private fun ShareError(code: String) {
         "RESTORE_CONNECT" -> R.string.share_restore_help
         "GAME_MISSING" -> R.string.share_game_missing
         "SPLIT_APK" -> R.string.share_split_apk
-        else -> R.string.share_failed
+        else -> if (bundles) R.string.bundle_failed else R.string.share_failed
     }
     Text(stringResource(message), color = MaterialTheme.colorScheme.error)
 }

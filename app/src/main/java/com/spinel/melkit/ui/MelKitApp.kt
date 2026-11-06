@@ -210,6 +210,11 @@ fun MelKitApp(shareRequest: Int = 0) {
                     FileScanScreen(scanState, scanModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else if (route == "share") {
                     DirectShareScreen(shareModel, libraryModel, libraryState, savedModel, savedState) { navigate("shizuku") }
+                } else if (route == "bundles") {
+                    val bundleModel: ShareViewModel = viewModel(key = "bundles")
+                    DirectShareScreen(bundleModel, libraryModel, libraryState, savedModel, savedState, bundles = true) {
+                        navigate("shizuku")
+                    }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -355,7 +360,8 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
     if (selected == 0) {
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
-            ToolCard(feature.title, feature.description, feature.icon, planned = feature.route !in listOf("toggles", "profiles", "scanner")) { navigate(feature.route) }
+            ToolCard(feature.title, feature.description, feature.icon,
+                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles")) { navigate(feature.route) }
         }
     } else {
         MoreAppsScreen()

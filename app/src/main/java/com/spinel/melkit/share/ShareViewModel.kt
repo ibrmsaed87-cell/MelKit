@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
@@ -21,16 +22,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
+import java.io.EOFException
 import java.io.File
 import java.io.IOException
 import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.UUID
+import java.util.zip.ZipException
 
 internal data class ReceivedFile(val file: File, val path: String, val batch: String, val bytes: Long)
 internal data class SharePage(val queue: List<ShareInput> = emptyList(), val received: List<ReceivedFile> = emptyList(),
-    val busy: Boolean = false, val issue: String? = null, val imported: Boolean = false, val saved: Boolean = false)
+    val busy: Boolean = false, val issue: String? = null, val imported: Boolean = false, val saved: Boolean = false,
+    val bundleUri: Uri? = null, val bundleBatch: String? = null)
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application
@@ -54,7 +60,8 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
 
     fun remove(path: String) {
         val key = ShareWire.pathKey(path)
-        mutableState.update { it.copy(queue = it.queue.filterNot { item -> ShareWire.pathKey(item.path) == key }, issue = null) }
+        mutableState.update { it.copy(queue = it.queue.filterNot { item -> ShareWire.pathKey(item.path) == key },
+            issue = null, bundleUri = null) }
     }
 
     private fun add(input: ShareInput) {
@@ -64,7 +71,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
             !ShareWire.validPath(input.path) || input.size == 0L || input.size > ShareWire.MAX_FILE -> issue("INVALID_FILE")
             queue.any { ShareWire.pathKey(it.path) == key } -> issue("DUPLICATE_NAME")
             queue.size >= ShareWire.MAX_FILES -> issue("LIMIT")
-            else -> mutableState.update { it.copy(queue = it.queue + input) }
+            else -> mutableState.update { it.copy(queue = it.queue + input, bundleUri = null) }
         }
     }
 
@@ -105,6 +112,69 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
 
     private fun open(uri: Uri) = if (uri.scheme == "file") File(requireNotNull(uri.path)).inputStream()
         else context.contentResolver.openInputStream(uri) ?: throw IOException("SOURCE_ACCESS")
+
+    fun saveBundle(destination: Uri) = run {
+        val queue = mutableState.value.queue
+        mutableState.update { it.copy(bundleUri = null) }
+        runInterruptible(Dispatchers.IO) {
+            try {
+                withBundleArchive { archive ->
+                    ContentBundle.write(archive, queue.map { input ->
+                        ContentBundle.Source(input.path, input.size, { input.open() }, { input.verifySource() })
+                    })
+                    val size = archive.length()
+                    val written = MessageDigest.getInstance("SHA-256")
+                    val verified = MessageDigest.getInstance("SHA-256")
+                    val count = archive.inputStream().use { source ->
+                        val output = context.contentResolver.openOutputStream(destination, "w") ?: throw IOException("IO")
+                        output.use { ContentBundle.copy(source, it, size, written) }
+                    }
+                    val readBack = open(destination).use { ContentBundle.copy(it, null, size, verified) }
+                    check(count == size && readBack == size && MessageDigest.isEqual(written.digest(), verified.digest())) { "CHECKSUM" }
+                }
+            } catch (error: Exception) {
+                runCatching { DocumentsContract.deleteDocument(context.contentResolver, destination) }
+                throw error
+            }
+        }
+        mutableState.update { it.copy(bundleUri = destination) }
+    }
+
+    fun importBundle(uri: Uri) = run {
+        val batch = runInterruptible(Dispatchers.IO) {
+            withBundleArchive { archive ->
+                open(uri).use { source ->
+                    archive.outputStream().use { ContentBundle.copy(source, it, ContentBundle.MAX_ARCHIVE, null) }
+                }
+                val root = MelKitShareService.receivedDirectory(context)
+                check(root.isDirectory || root.mkdirs()) { "SAVE_FAILED" }
+                val id = UUID.randomUUID().toString()
+                val staging = File(archive.parentFile, "$id.bundle-part")
+                try {
+                    ContentBundle.unpack(archive, staging)
+                    val destination = File(root, id)
+                    check(!destination.exists() && staging.renameTo(destination)) { "SAVE_FAILED" }
+                    id
+                } catch (_: ZipException) {
+                    throw IOException("INVALID_BUNDLE")
+                } catch (_: EOFException) {
+                    throw IOException("INVALID_BUNDLE")
+                } finally {
+                    staging.deleteRecursively()
+                }
+            }
+        }
+        mutableState.update { it.copy(bundleBatch = batch) }
+    }
+
+    private fun <T> withBundleArchive(task: (File) -> T): T {
+        val archive = File.createTempFile("melkit-bundle-", ".zip", context.cacheDir)
+        try { return task(archive) } finally { archive.delete() }
+    }
+
+    fun shareBundle(activity: Context, uri: Uri) {
+        runCatching { shareUri(activity, uri, "application/zip", "MelKit") }.onFailure { issue("IO") }
+    }
 
     fun send(activity: Context) {
         val queue = mutableState.value.queue
@@ -187,9 +257,13 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
 
     private fun shareFile(activity: Context, file: File, type: String) {
         val uri = FileProvider.getUriForFile(context, context.packageName + ".sharefiles", file)
+        shareUri(activity, uri, type, file.name)
+    }
+
+    private fun shareUri(activity: Context, uri: Uri, type: String, label: String) {
         val send = Intent(Intent.ACTION_SEND).setType(type).putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        send.clipData = ClipData.newRawUri(file.name, uri)
+        send.clipData = ClipData.newRawUri(label, uri)
         activity.startActivity(Intent.createChooser(send, null))
     }
 

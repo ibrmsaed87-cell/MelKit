@@ -44,7 +44,16 @@
     <string name="send_hint">Choose content, then show a QR code</string>
     <string name="receive_hint">Scan the sender’s QR code</string>
     <string name="share_bundle">Content bundles</string>
-    <string name="bundle_description">Collect selected mods, maps, and saves into one shareable bundle.</string>
+    <string name="bundle_description">Collect selected mods, maps, saves, and worlds into one shareable bundle.</string>
+    <string name="bundle_choose">Choose files for a bundle</string>
+    <string name="bundle_create">Create and save bundle</string>
+    <string name="bundle_saved">The verified bundle was saved.</string>
+    <string name="bundle_import">Open a MelKit bundle</string>
+    <string name="bundle_verified">The bundle was verified. Open its contents to choose files to restore.</string>
+    <string name="bundle_contents">Bundle contents</string>
+    <string name="bundle_invalid">Choose a valid bundle created by MelKit.</string>
+    <string name="bundle_checksum">File verification failed. Try another copy of the bundle.</string>
+    <string name="bundle_failed">MelKit could not complete the bundle operation. Check the selected files and try again.</string>
     <string name="profiles_description">Create groups for cars, battles, and more. Switch groups while keeping essential mods enabled.</string>
     <string name="toggler">Mod switches</string>
     <string name="toggler_description">Move unused mods to a separate vault and restore them when needed, without downloading them again.</string>

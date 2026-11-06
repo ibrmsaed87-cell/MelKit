@@ -40,7 +40,16 @@
     <string name="send_hint">اختر المحتوى ثم اعرض رمز الاقتران</string>
     <string name="receive_hint">امسح رمز الاقتران من هاتف المرسل</string>
     <string name="share_bundle">حزم المحتوى</string>
-    <string name="bundle_description">اجمع مودات وخرائط وملفات حفظ تختارها في حزمة واحدة للمشاركة.</string>
+    <string name="bundle_description">اجمع المودات والخرائط وملفات الحفظ والعوالم التي تختارها في حزمة واحدة للمشاركة.</string>
+    <string name="bundle_choose">اختيار ملفات الحزمة</string>
+    <string name="bundle_create">إنشاء الحزمة وحفظها</string>
+    <string name="bundle_saved">حُفظت الحزمة بعد التحقق منها.</string>
+    <string name="bundle_import">فتح حزمة MelKit</string>
+    <string name="bundle_verified">تم التحقق من الحزمة. افتح محتوياتها لاختيار الملفات التي تريد استعادتها.</string>
+    <string name="bundle_contents">محتويات الحزمة</string>
+    <string name="bundle_invalid">اختر حزمة صالحة أنشأها MelKit.</string>
+    <string name="bundle_checksum">تعذّر التحقق من الملفات. جرّب نسخة أخرى من الحزمة.</string>
+    <string name="bundle_failed">تعذّر إكمال العملية. تحقّق من الملفات المحددة وحاول مجددًا.</string>
     <string name="profiles_description">أنشئ مجموعات للسيارات والحروب وغيرها، وبدّل بينها مع إبقاء المودات الأساسية مفعّلة.</string>
     <string name="toggler">تفعيل المودات وتعطيلها</string>
     <string name="toggler_description">انقل المودات غير المستخدمة إلى خزنة منفصلة، وأعدها عند الحاجة دون تنزيلها مجددًا.</string>
