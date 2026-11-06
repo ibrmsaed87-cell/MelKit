@@ -95,6 +95,7 @@ import com.spinel.melkit.storage.ModVaultViewModel
 import com.spinel.melkit.storage.ModProfilesViewModel
 import com.spinel.melkit.storage.ModProfilesState
 import com.spinel.melkit.storage.FileScanViewModel
+import com.spinel.melkit.storage.LibraryOrganizationViewModel
 import kotlinx.coroutines.flow.first
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
@@ -132,6 +133,8 @@ fun MelKitApp(shareRequest: Int = 0) {
     val scanModel: FileScanViewModel = viewModel()
     val scanState by scanModel.state.collectAsState()
     val shareModel: ShareViewModel = viewModel()
+    val organization: LibraryOrganizationViewModel = viewModel()
+    val labels by organization.labels.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -199,7 +202,8 @@ fun MelKitApp(shareRequest: Int = 0) {
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             key(route) {
                 if (route == "library") {
-                    LibraryScreen(libraryState, libraryModel) { navigate("shizuku") }
+                    LibraryScreen(libraryState, libraryModel, labels, organization,
+                        onOrganize = { navigate("categories") }, onGuide = { navigate("shizuku") })
                 } else if (route == "backups") {
                     SavedCopiesScreen(savedState, savedModel, libraryModel, libraryState)
                 } else if (route == "toggles") {
@@ -215,6 +219,8 @@ fun MelKitApp(shareRequest: Int = 0) {
                     DirectShareScreen(bundleModel, libraryModel, libraryState, savedModel, savedState, bundles = true) {
                         navigate("shizuku")
                     }
+                } else if (route == "categories") {
+                    LibraryOrganizationScreen(labels, organization) { navigate("library") }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -361,7 +367,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
             ToolCard(feature.title, feature.description, feature.icon,
-                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles")) { navigate(feature.route) }
+                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories")) { navigate(feature.route) }
         }
     } else {
         MoreAppsScreen()

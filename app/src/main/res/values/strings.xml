@@ -62,6 +62,15 @@
     <string name="scanner_description">Review empty and duplicate files, supported-format errors, and files that could not be checked. Quarantine is reversible.</string>
     <string name="categories">Categories and names</string>
     <string name="categories_description">Organize your library with personal names and categories while preserving original game files.</string>
+    <string name="organization_help">Choose Organize file on a library card. Clear both fields to remove its display name and category.</string>
+    <string name="organization_edit">Organize file</string>
+    <string name="organization_name">Display name in MelKit</string>
+    <string name="organization_category">Category</string>
+    <string name="organization_search">Search organized files</string>
+    <string name="organization_all">All</string>
+    <string name="organization_empty">Files with a display name or category will appear here.</string>
+    <string name="organization_no_results">No organized files match this search.</string>
+    <string name="organization_save_failed">Could not save these details. Try again.</string>
     <string name="thumbnails">Thumbnail maker</string>
     <string name="thumbnails_description">Choose a screenshot and crop a cover for your mod or bundle inside MelKit.</string>
     <string name="history">Activity and undo</string>

@@ -49,7 +49,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,17 +72,22 @@ import com.spinel.melkit.storage.GameEntry
 import com.spinel.melkit.storage.GameLibraryState
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.LibraryIssue
+import com.spinel.melkit.storage.LibraryLabel
+import com.spinel.melkit.storage.LibraryOrganizationViewModel
+import com.spinel.melkit.storage.NewFileRestore
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide: () -> Unit) {
+internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, labels: Map<String, LibraryLabel>,
+    organization: LibraryOrganizationViewModel, onOrganize: () -> Unit, onGuide: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
     val numbers = NumberFormat.getIntegerInstance(locale)
     val listState = rememberLazyListState()
+    var editing by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(state.path, state.offset) { listState.scrollToItem(0) }
     BackHandler(enabled = state.path.isNotEmpty() && state.connected && !state.busy && state.proof == null) {
         model.browse(state.path.substringBeforeLast('/', ""))
@@ -98,6 +106,7 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
         }
         item {
             Text(stringResource(R.string.library_readonly_notice), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onOrganize) { Text(stringResource(R.string.categories)) }
         }
         item {
             Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
@@ -151,7 +160,11 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
                 }
             }
             items(state.entries, key = { it.path }) { entry ->
-                EntryCard(entry, state.connected && !state.busy, model, state.connected, state.previewRevision,
+                val edit: (() -> Unit)? = if (entry.regular && NewFileRestore.supported(entry.path)) {
+                    { editing = entry.path }
+                } else null
+                EntryCard(entry, labels[entry.path], state.connected && !state.busy, model, state.connected, state.previewRevision,
+                    onOrganize = edit,
                     onOpen = { model.browse(entry.path) },
                     onRead = { model.verifyRead(entry) },
                     onExport = {
@@ -185,6 +198,7 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
             }
         }
     }
+    editing?.let { path -> LibraryLabelEditor(path, labels, organization) { editing = null } }
     state.proof?.let { proof ->
         AlertDialog(
             onDismissRequest = model::dismissProof,
@@ -215,8 +229,9 @@ fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, onGuide:
 }
 
 @Composable
-private fun EntryCard(entry: GameEntry, enabled: Boolean, model: GameLibraryViewModel, connected: Boolean,
-    previewRevision: Int, onOpen: () -> Unit, onRead: () -> Unit, onExport: () -> Unit) {
+private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, model: GameLibraryViewModel,
+    connected: Boolean, previewRevision: Int, onOrganize: (() -> Unit)?, onOpen: () -> Unit,
+    onRead: () -> Unit, onExport: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
     val preview by produceState<Bitmap?>(null, entry, connected, previewRevision) {
@@ -254,10 +269,15 @@ private fun EntryCard(entry: GameEntry, enabled: Boolean, model: GameLibraryView
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(entry.name, fontWeight = FontWeight.Bold,
+                    val title = label?.name.orEmpty().ifEmpty { entry.name }
+                    Text(title, fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.ContentOrLtr))
+                    if (title != entry.name) Text(entry.name,
+                        style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.ContentOrLtr),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(stringResource(type), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    label?.category?.takeIf { it.isNotEmpty() }?.let { Text(it, color = MelkitMint) }
                 }
             }
             if (!entry.directory) {
@@ -272,6 +292,9 @@ private fun EntryCard(entry: GameEntry, enabled: Boolean, model: GameLibraryView
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onRead, enabled = enabled) { Text(stringResource(R.string.library_read_test)) }
                     FilledTonalButton(onClick = onExport, enabled = enabled) { Text(stringResource(R.string.library_export)) }
+                }
+                if (onOrganize != null) TextButton(onClick = onOrganize, enabled = enabled) {
+                    Text(stringResource(R.string.organization_edit))
                 }
             }
         }

@@ -58,6 +58,15 @@
     <string name="scanner_description">راجع الملفات الفارغة والمكررة وأخطاء الصيغ المدعومة وما تعذّر فحصه. يمكن استرجاع الملفات المعزولة.</string>
     <string name="categories">التصنيفات والأسماء</string>
     <string name="categories_description">نظّم مكتبتك بأسماء وتصنيفات تختارها مع الحفاظ على ملفات اللعبة الأصلية.</string>
+    <string name="organization_help">اضغط «تنظيم الملف» على بطاقته في المكتبة. لإزالة اسم العرض والتصنيف، أفرغ الحقلين ثم احفظ.</string>
+    <string name="organization_edit">تنظيم الملف</string>
+    <string name="organization_name">اسم العرض في MelKit</string>
+    <string name="organization_category">التصنيف</string>
+    <string name="organization_search">البحث في الملفات المنظّمة</string>
+    <string name="organization_all">الكل</string>
+    <string name="organization_empty">تظهر هنا الملفات التي تضيف لها اسم عرض أو تصنيفًا.</string>
+    <string name="organization_no_results">لا توجد ملفات منظّمة تطابق البحث.</string>
+    <string name="organization_save_failed">تعذّر حفظ البيانات. حاول مجددًا.</string>
     <string name="thumbnails">الصور المصغرة</string>
     <string name="thumbnails_description">اختر لقطة شاشة وقصّها لتكون غلافًا للمود أو الحزمة داخل MelKit.</string>
     <string name="history">سجل العمليات والتراجع</string>
