@@ -12,6 +12,8 @@ import android.util.LruCache
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.spinel.melkit.BuildConfig
+import com.spinel.melkit.share.ShareInput
+import com.spinel.melkit.share.ShareWire
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -240,6 +242,15 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         } finally {
             mutableState.update { it.copy(busy = false) }
         }
+    }
+
+    internal fun shareInput(entry: GameEntry): ShareInput? {
+        if (!entry.regular || !ShareWire.validPath(entry.path) || entry.size !in 1..ShareWire.MAX_FILE) return null
+        val service = authorizedService() ?: return null
+        return ShareInput(entry.path, entry.size, open = {
+            checkUnchanged(service, entry)
+            ParcelFileDescriptor.AutoCloseInputStream(service.openRead(storageRoot, entry.path))
+        }, verifySource = { checkUnchanged(service, entry) })
     }
 
     fun verifyRead(entry: GameEntry) {

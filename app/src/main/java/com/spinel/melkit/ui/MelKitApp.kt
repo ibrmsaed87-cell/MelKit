@@ -87,6 +87,7 @@ import androidx.core.os.ConfigurationCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spinel.melkit.BuildConfig
+import com.spinel.melkit.share.ShareViewModel
 import com.spinel.melkit.R
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.SavedCopiesViewModel
@@ -119,7 +120,7 @@ private val features = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MelKitApp() {
+fun MelKitApp(shareRequest: Int = 0) {
     val libraryModel: GameLibraryViewModel = viewModel()
     val libraryState by libraryModel.state.collectAsState()
     val savedModel: SavedCopiesViewModel = viewModel()
@@ -130,9 +131,16 @@ fun MelKitApp() {
     val profilesState by profilesModel.state.collectAsState()
     val scanModel: FileScanViewModel = viewModel()
     val scanState by scanModel.state.collectAsState()
+    val shareModel: ShareViewModel = viewModel()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(shareRequest) {
+        if (shareRequest > 0) {
+            parent = "share"
+            route = "share"
+        }
+    }
     val root = destinations.any { it.route == route }
     val selectedRoot = if (root) route else parent
     val navigate: (String) -> Unit = { target ->
@@ -200,6 +208,8 @@ fun MelKitApp() {
                     ModProfilesScreen(profilesState, profilesModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else if (route == "scanner") {
                     FileScanScreen(scanState, scanModel, libraryModel, libraryState) { navigate("shizuku") }
+                } else if (route == "share") {
+                    DirectShareScreen(shareModel, libraryModel, libraryState, savedModel, savedState) { navigate("shizuku") }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -208,7 +218,6 @@ fun MelKitApp() {
                     ) {
                         when (route) {
                             "home" -> HomeScreen(navigate, libraryState.connected, profilesState, profilesModel, libraryModel)
-                            "share" -> ShareScreen(navigate)
                             "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
                             "settings" -> SettingsScreen()
                             "shizuku" -> ShizukuScreen()
@@ -334,18 +343,6 @@ private fun PlannedScreen(title: Int, description: Int, icon: ImageVector) {
             AssistChip(onClick = {}, enabled = false, label = { Text(stringResource(R.string.in_preparation)) })
         }
     }
-}
-
-@Composable
-private fun ShareScreen(navigate: (String) -> Unit) {
-    SectionLabel(R.string.sharing)
-    MutedText(R.string.sharing_description)
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        ActionCard(R.string.send, R.string.send_hint, Icons.Outlined.Share, {}, Modifier.weight(1f), enabled = false)
-        ActionCard(R.string.receive, R.string.receive_hint, Icons.Outlined.SwapHoriz, {}, Modifier.weight(1f), enabled = false)
-    }
-    Text(stringResource(R.string.in_preparation), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    ToolCard(R.string.share_bundle, R.string.bundle_description, Icons.Outlined.Inventory2) { navigate("bundles") }
 }
 
 @Composable
