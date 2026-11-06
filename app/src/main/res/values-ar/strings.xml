@@ -44,6 +44,8 @@
     <string name="bundle_choose">اختيار ملفات الحزمة</string>
     <string name="bundle_create">إنشاء الحزمة وحفظها</string>
     <string name="bundle_saved">حُفظت الحزمة بعد التحقق منها.</string>
+    <string name="bundle_send_direct">إرسال الحزمة عبر MelKit</string>
+    <string name="bundle_open_received">فتح الحزمة المستلمة</string>
     <string name="bundle_import">فتح حزمة MelKit</string>
     <string name="bundle_verified">تم التحقق من الحزمة. افتح محتوياتها لاختيار الملفات التي تريد استعادتها.</string>
     <string name="bundle_contents">محتويات الحزمة</string>

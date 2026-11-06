@@ -146,25 +146,36 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 open(uri).use { source ->
                     archive.outputStream().use { ContentBundle.copy(source, it, ContentBundle.MAX_ARCHIVE, null) }
                 }
-                val root = MelKitShareService.receivedDirectory(context)
-                check(root.isDirectory || root.mkdirs()) { "SAVE_FAILED" }
-                val id = UUID.randomUUID().toString()
-                val staging = File(archive.parentFile, "$id.bundle-part")
-                try {
-                    ContentBundle.unpack(archive, staging)
-                    val destination = File(root, id)
-                    check(!destination.exists() && staging.renameTo(destination)) { "SAVE_FAILED" }
-                    id
-                } catch (_: ZipException) {
-                    throw IOException("INVALID_BUNDLE")
-                } catch (_: EOFException) {
-                    throw IOException("INVALID_BUNDLE")
-                } finally {
-                    staging.deleteRecursively()
-                }
+                unpackBundle(archive)
             }
         }
         mutableState.update { it.copy(bundleBatch = batch) }
+    }
+
+    fun openReceivedBundle(item: ReceivedFile) = run {
+        mutableState.update { it.copy(bundleBatch = null) }
+        val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}".toByteArray()).toString()
+        val batch = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
+        mutableState.update { it.copy(bundleBatch = batch) }
+    }
+
+    private fun unpackBundle(archive: File, id: String = UUID.randomUUID().toString()): String {
+        val root = MelKitShareService.receivedDirectory(context)
+        check(root.isDirectory || root.mkdirs() || root.isDirectory) { "SAVE_FAILED" }
+        val destination = File(root, id)
+        if (destination.isDirectory) return id
+        val staging = File(context.cacheDir, "${UUID.randomUUID()}.bundle-part")
+        try {
+            ContentBundle.unpack(archive, staging)
+            check((!destination.exists() && staging.renameTo(destination)) || destination.isDirectory) { "SAVE_FAILED" }
+            return id
+        } catch (_: ZipException) {
+            throw IOException("INVALID_BUNDLE")
+        } catch (_: EOFException) {
+            throw IOException("INVALID_BUNDLE")
+        } finally {
+            staging.deleteRecursively()
+        }
     }
 
     private fun <T> withBundleArchive(task: (File) -> T): T {
@@ -174,6 +185,22 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
 
     fun shareBundle(activity: Context, uri: Uri) {
         runCatching { shareUri(activity, uri, "application/zip", "MelKit") }.onFailure { issue("IO") }
+    }
+
+    fun sendBundle(activity: Context, uri: Uri) = run {
+        val input = withContext(Dispatchers.IO) {
+            val properties = arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)
+            val (name, size) = context.contentResolver.query(uri, properties, null, null, null)?.use { cursor ->
+                if (!cursor.moveToFirst()) null else {
+                    val displayName = if (cursor.isNull(0)) "" else cursor.getString(0)
+                    val length = if (cursor.isNull(1)) -1L else cursor.getLong(1)
+                    displayName to length
+                }
+            } ?: ("" to -1L)
+            val path = "Bundles/$name".takeIf(ShareWire::validBundlePath) ?: "Bundles/MelKit-Bundle.zip"
+            ShareInput(path, size.takeIf { it > 0 } ?: -1L, open = { open(uri) })
+        }
+        MelKitShareService.send(activity, listOf(input))
     }
 
     fun send(activity: Context) {
@@ -195,7 +222,9 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 .sortedByDescending(File::lastModified).flatMap { batch ->
                     batch.walkTopDown().maxDepth(33).filter { it.isFile }.mapNotNull { file ->
                         val path = file.relativeTo(batch).invariantSeparatorsPath
-                        if (ShareWire.validPath(path)) ReceivedFile(file, path, batch.name, file.length()) else null
+                        if (ShareWire.validPath(path) || ShareWire.validBundlePath(path)) {
+                            ReceivedFile(file, path, batch.name, file.length())
+                        } else null
                     }.sortedBy { it.path }.toList()
                 }
         }

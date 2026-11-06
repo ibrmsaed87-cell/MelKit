@@ -76,7 +76,16 @@ public final class ShareWire {
     }
 
     public static boolean validPath(String path) {
-        if (path == null || !NewFileRestore.supported(path) || path.length() > 4096 || path.indexOf('\\') >= 0) return false;
+        return NewFileRestore.supported(path) && validSegments(path);
+    }
+
+    public static boolean validBundlePath(String path) {
+        return path != null && path.startsWith("Bundles/") && path.lastIndexOf('/') == "Bundles".length() &&
+                path.toLowerCase(Locale.ROOT).endsWith(".zip") && validSegments(path);
+    }
+
+    private static boolean validSegments(String path) {
+        if (path.length() > 4096 || path.indexOf('\\') >= 0) return false;
         String[] segments = path.split("/", -1);
         if (segments.length > 33) return false;
         for (String segment : segments) {
@@ -85,6 +94,15 @@ public final class ShareWire {
                     segment.chars().anyMatch(c -> Character.isISOControl(c) || c == ':')) return false;
         }
         return true;
+    }
+
+    static long payloadLimit(String path, int count) {
+        if (validPath(path)) return MAX_FILE;
+        return count == 1 && validBundlePath(path) ? ContentBundle.MAX_ARCHIVE : 0;
+    }
+
+    static long batchLimit(int count) {
+        return count == 1 ? ContentBundle.MAX_ARCHIVE : MAX_TOTAL;
     }
 
     public static String pathKey(String path) {
@@ -99,7 +117,7 @@ public final class ShareWire {
 
     public static Entry stage(File file, String path, InputStream source, long expected, long limit, Control control)
             throws Exception {
-        require(validPath(path) && limit > 0 && limit <= MAX_FILE && expected <= limit, "INVALID_FILE");
+        require(limit > 0 && limit <= payloadLimit(path, 1) && expected <= limit, "INVALID_FILE");
         require(file.getParentFile().getUsableSpace() >= HEADROOM + Math.max(0, expected), "SPACE");
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] buffer = new byte[65536];
@@ -124,11 +142,11 @@ public final class ShareWire {
         long total = 0;
         Set<String> paths = new HashSet<>();
         for (Entry entry : files) {
-            require(validPath(entry.path) && paths.add(pathKey(entry.path)) && entry.size > 0 &&
-                    entry.size <= MAX_FILE && validKey(entry.hash), "INVALID_FILE");
+            require(entry.size > 0 && entry.size <= payloadLimit(entry.path, files.size()) &&
+                    paths.add(pathKey(entry.path)) && validKey(entry.hash), "INVALID_FILE");
             total += entry.size;
         }
-        require(total <= MAX_TOTAL, "INVALID_FILE");
+        require(total <= batchLimit(files.size()), "INVALID_FILE");
         server.setSoTimeout(1000);
         long deadline = System.nanoTime() + 600_000_000_000L;
         while (System.nanoTime() < deadline) {
@@ -207,14 +225,14 @@ public final class ShareWire {
             require(MAGIC.equals(input.readUTF()), "INCOMPATIBLE");
             int count = input.readInt();
             long total = input.readLong(), declared = 0;
-            require(count > 0 && count <= MAX_FILES && total > 0 && total <= MAX_TOTAL, "INVALID_FILE");
+            require(count > 0 && count <= MAX_FILES && total > 0 && total <= batchLimit(count), "INVALID_FILE");
             List<Entry> headers = new ArrayList<>();
             Set<String> paths = new HashSet<>();
             for (int index = 0; index < count; index++) {
                 String path = input.readUTF();
                 long size = input.readLong();
                 String hash = input.readUTF();
-                require(validPath(path) && paths.add(pathKey(path)) && size > 0 && size <= MAX_FILE && validKey(hash), "INVALID_FILE");
+                require(size > 0 && size <= payloadLimit(path, count) && paths.add(pathKey(path)) && validKey(hash), "INVALID_FILE");
                 headers.add(new Entry(new File(destination, path), path, hash, size));
                 declared += size;
             }

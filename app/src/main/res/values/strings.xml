@@ -48,6 +48,8 @@
     <string name="bundle_choose">Choose files for a bundle</string>
     <string name="bundle_create">Create and save bundle</string>
     <string name="bundle_saved">The verified bundle was saved.</string>
+    <string name="bundle_send_direct">Send bundle via MelKit</string>
+    <string name="bundle_open_received">Open received bundle</string>
     <string name="bundle_import">Open a MelKit bundle</string>
     <string name="bundle_verified">The bundle was verified. Open its contents to choose files to restore.</string>
     <string name="bundle_contents">Bundle contents</string>

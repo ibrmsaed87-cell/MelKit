@@ -116,16 +116,16 @@ class MelKitShareService : Service() {
         current.stage = directory
         work(current) {
             require(inputs.size in 1..ShareWire.MAX_FILES) { "INVALID_FILE" }
-            require(inputs.all { ShareWire.validPath(it.path) }) { "INVALID_FILE" }
+            require(inputs.all { ShareWire.payloadLimit(it.path, inputs.size) > 0 }) { "INVALID_FILE" }
             require(inputs.distinctBy { ShareWire.pathKey(it.path) }.size == inputs.size) { "DUPLICATE_NAME" }
             require(directory.mkdirs()) { "SPACE" }
-            var remaining = ShareWire.MAX_TOTAL
+            var remaining = ShareWire.batchLimit(inputs.size)
             val files = inputs.mapIndexed { index, input ->
                 current.control.touch()
                 val source = current.control.track(input.open())
                 val entry = try {
                     source.use { ShareWire.stage(File(directory, index.toString()), input.path, it, input.size,
-                        minOf(ShareWire.MAX_FILE, remaining), current.control) }
+                        minOf(ShareWire.payloadLimit(input.path, inputs.size), remaining), current.control) }
                 } finally { current.control.untrack(source) }
                 input.verifySource()
                 remaining -= entry.size

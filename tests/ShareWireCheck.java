@@ -1,4 +1,5 @@
 import com.spinel.melkit.share.ShareWire;
+import com.spinel.melkit.share.ContentBundle;
 import java.io.*;
 import java.net.*;
 import java.nio.file.*;
@@ -125,6 +126,43 @@ public final class ShareWireCheck {
             }
             check(!new File(history, cancelled).exists() && !new File(history, "." + cancelled + ".part").exists(),
                     "Cancellation leaves no visible files or partial batch");
+
+            String archivePath = "Bundles/حزمة.zip";
+            check(ShareWire.validBundlePath(archivePath) && !ShareWire.validPath(archivePath),
+                    "A bundle travels as a distinct payload, not as a game file");
+            check(!ShareWire.validBundlePath("Bundles/../outside.zip") &&
+                    !ShareWire.validBundlePath("Bundles/nested/bundle.zip") &&
+                    !ShareWire.validBundlePath("Saves/ordinary.zip"), "Reject unexpected ZIP paths");
+            Path archive = root.resolve("original.zip");
+            ContentBundle.write(archive.toFile(), List.of(
+                    new ContentBundle.Source("Maps/one.melmap", map.length, () -> new ByteArrayInputStream(map), () -> {}),
+                    new ContentBundle.Source("Mods/nested/اثنان.melmod", mod.length, () -> new ByteArrayInputStream(mod), () -> {})));
+            ShareWire.Entry bundle;
+            try (InputStream input = Files.newInputStream(archive)) {
+                bundle = ShareWire.stage(root.resolve("bundle.part").toFile(), archivePath, input,
+                        Files.size(archive), ContentBundle.MAX_ARCHIVE, new ShareWire.Control());
+            }
+            String bundleId = UUID.randomUUID().toString();
+            try {
+                ShareWire.send(null, bundleId, KEY, List.of(bundle, entries.get(0)), new ShareWire.Control(),
+                        item -> {}, () -> {});
+                throw new AssertionError("Mixed archive and game-file transfer accepted");
+            } catch (IOException expected) {
+                check(expected.getMessage().equals("INVALID_FILE"), "Send the ZIP as one item");
+            }
+            try (ServerSocket server = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
+                 ShareWire.Control control = new ShareWire.Control();
+                 Socket peer = new Socket(InetAddress.getLoopbackAddress(), server.getLocalPort())) {
+                var work = sender(server, bundleId, List.of(bundle), control, new ArrayList<>());
+                var batch = ShareWire.receive(peer, bundleId, KEY, history, new ShareWire.Control(), item -> {}, () -> {});
+                check(batch.size() == 1 && batch.get(0).path.equals(archivePath), "Receive one ZIP with its name");
+                check(Files.mismatch(archive, batch.get(0).file.toPath()) == -1, "Received ZIP is byte-identical");
+                Path restored = root.resolve("bundle-contents");
+                check(ContentBundle.unpack(batch.get(0).file, restored.toFile()) == 2, "Received bundle opens inside MelKit");
+                check(Arrays.equals(Files.readAllBytes(restored.resolve("Mods/nested/اثنان.melmod")), mod),
+                        "Received contents preserve paths and file bytes");
+                work.get(4, TimeUnit.SECONDS);
+            }
         } finally {
             try (var files = Files.walk(root)) {
                 for (Path file : files.sorted(Comparator.reverseOrder()).toList()) Files.delete(file);
