@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
@@ -13,8 +14,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.spinel.melkit.BuildConfig
 import com.spinel.melkit.storage.DownloadCopy
+import com.spinel.melkit.storage.CoverPhoto
 import com.spinel.melkit.storage.GameEntry
 import com.spinel.melkit.storage.GameLibraryViewModel
+import com.spinel.melkit.storage.PreviewBitmap
+import com.spinel.melkit.storage.PreviewImages
 import com.spinel.melkit.storage.SavedCopy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +40,8 @@ import java.util.zip.ZipException
 internal data class ReceivedFile(val file: File, val path: String, val batch: String, val bytes: Long)
 internal data class SharePage(val queue: List<ShareInput> = emptyList(), val received: List<ReceivedFile> = emptyList(),
     val busy: Boolean = false, val issue: String? = null, val imported: Boolean = false, val saved: Boolean = false,
-    val bundleUri: Uri? = null, val bundleBatch: String? = null)
+    val bundleUri: Uri? = null, val bundleBatch: String? = null,
+    val draftCover: Bitmap? = null, val receivedCover: Bitmap? = null)
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application
@@ -113,15 +118,20 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     private fun open(uri: Uri) = if (uri.scheme == "file") File(requireNotNull(uri.path)).inputStream()
         else context.contentResolver.openInputStream(uri) ?: throw IOException("SOURCE_ACCESS")
 
+    fun setBundleCover(cover: Bitmap?) {
+        mutableState.update { it.copy(draftCover = cover, bundleUri = null) }
+    }
+
     fun saveBundle(destination: Uri) = run {
         val queue = mutableState.value.queue
+        val cover = mutableState.value.draftCover
         mutableState.update { it.copy(bundleUri = null) }
         runInterruptible(Dispatchers.IO) {
             try {
                 withBundleArchive { archive ->
                     ContentBundle.write(archive, queue.map { input ->
                         ContentBundle.Source(input.path, input.size, { input.open() }, { input.verifySource() })
-                    })
+                    }, cover?.let(CoverPhoto::encode))
                     val size = archive.length()
                     val written = MessageDigest.getInstance("SHA-256")
                     val verified = MessageDigest.getInstance("SHA-256")
@@ -141,7 +151,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun importBundle(uri: Uri) = run {
-        val batch = runInterruptible(Dispatchers.IO) {
+        val (batch, cover) = runInterruptible(Dispatchers.IO) {
             withBundleArchive { archive ->
                 open(uri).use { source ->
                     archive.outputStream().use { ContentBundle.copy(source, it, ContentBundle.MAX_ARCHIVE, null) }
@@ -149,33 +159,38 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 unpackBundle(archive)
             }
         }
-        mutableState.update { it.copy(bundleBatch = batch) }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover) }
     }
 
     fun openReceivedBundle(item: ReceivedFile) = run {
-        mutableState.update { it.copy(bundleBatch = null) }
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null) }
         val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}".toByteArray()).toString()
-        val batch = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
-        mutableState.update { it.copy(bundleBatch = batch) }
+        val (batch, cover) = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover) }
     }
 
-    private fun unpackBundle(archive: File, id: String = UUID.randomUUID().toString()): String {
+    private fun unpackBundle(archive: File, id: String = UUID.randomUUID().toString()): Pair<String, Bitmap?> {
         val root = MelKitShareService.receivedDirectory(context)
         check(root.isDirectory || root.mkdirs() || root.isDirectory) { "SAVE_FAILED" }
         val destination = File(root, id)
-        if (destination.isDirectory) return id
-        val staging = File(context.cacheDir, "${UUID.randomUUID()}.bundle-part")
-        try {
-            ContentBundle.unpack(archive, staging)
-            check((!destination.exists() && staging.renameTo(destination)) || destination.isDirectory) { "SAVE_FAILED" }
-            return id
-        } catch (_: ZipException) {
-            throw IOException("INVALID_BUNDLE")
-        } catch (_: EOFException) {
-            throw IOException("INVALID_BUNDLE")
-        } finally {
-            staging.deleteRecursively()
+        if (!destination.isDirectory) {
+            val staging = File(context.cacheDir, "${UUID.randomUUID()}.bundle-part")
+            try {
+                ContentBundle.unpack(archive, staging)
+                check((!destination.exists() && staging.renameTo(destination)) || destination.isDirectory) { "SAVE_FAILED" }
+            } catch (_: ZipException) {
+                throw IOException("INVALID_BUNDLE")
+            } catch (_: EOFException) {
+                throw IOException("INVALID_BUNDLE")
+            } finally {
+                staging.deleteRecursively()
+            }
         }
+        val image = File(destination, ContentBundle.COVER_FILE)
+        val cover = runCatching {
+            if (image.length() in 1L..PreviewImages.MAX_IMAGE_BYTES.toLong()) PreviewBitmap.decode(image.readBytes()) else null
+        }.getOrNull()
+        return id to cover
     }
 
     private fun <T> withBundleArchive(task: (File) -> T): T {

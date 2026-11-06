@@ -73,6 +73,16 @@
     <string name="organization_save_failed">Could not save these details. Try again.</string>
     <string name="thumbnails">Thumbnail maker</string>
     <string name="thumbnails_description">Choose a screenshot and crop a cover for your mod or bundle inside MelKit.</string>
+    <string name="cover_tool_help">Choose Edit cover on a file card or while creating a bundle.</string>
+    <string name="cover_edit">Edit cover</string>
+    <string name="cover_choose">Choose photo</string>
+    <string name="cover_zoom">Zoom</string>
+    <string name="cover_horizontal">Horizontal position</string>
+    <string name="cover_vertical">Vertical position</string>
+    <string name="cover_preview">Cover preview</string>
+    <string name="cover_remove">Remove custom cover</string>
+    <string name="cover_read_failed">Could not read this image. Choose another photo.</string>
+    <string name="cover_save_failed">Could not save this cover. Try again.</string>
     <string name="history">Activity and undo</string>
     <string name="history_description">Review changes and undo supported operations with the original files preserved.</string>
     <string name="shizuku_guide">Shizuku setup guide</string>

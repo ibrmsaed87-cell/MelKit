@@ -96,6 +96,7 @@ import com.spinel.melkit.storage.ModProfilesViewModel
 import com.spinel.melkit.storage.ModProfilesState
 import com.spinel.melkit.storage.FileScanViewModel
 import com.spinel.melkit.storage.LibraryOrganizationViewModel
+import com.spinel.melkit.storage.LibraryCoversViewModel
 import kotlinx.coroutines.flow.first
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
@@ -202,7 +203,8 @@ fun MelKitApp(shareRequest: Int = 0) {
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             key(route) {
                 if (route == "library") {
-                    LibraryScreen(libraryState, libraryModel, labels, organization,
+                    val covers: LibraryCoversViewModel = viewModel()
+                    LibraryScreen(libraryState, libraryModel, labels, organization, covers,
                         onOrganize = { navigate("categories") }, onGuide = { navigate("shizuku") })
                 } else if (route == "backups") {
                     SavedCopiesScreen(savedState, savedModel, libraryModel, libraryState)
@@ -232,6 +234,15 @@ fun MelKitApp(shareRequest: Int = 0) {
                             "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
                             "settings" -> SettingsScreen()
                             "shizuku" -> ShizukuScreen()
+                            "thumbnails" -> {
+                                Text(stringResource(R.string.cover_tool_help))
+                                FilledTonalButton(onClick = { navigate("library") }) {
+                                    Text(stringResource(R.string.library_browse))
+                                }
+                                FilledTonalButton(onClick = { navigate("bundles") }) {
+                                    Text(stringResource(R.string.share_bundle))
+                                }
+                            }
                             else -> features.find { it.route == route }?.let {
                                 PlannedScreen(it.title, it.description, it.icon)
                             }
@@ -367,7 +378,9 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
             ToolCard(feature.title, feature.description, feature.icon,
-                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories")) { navigate(feature.route) }
+                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories", "thumbnails")) {
+                navigate(feature.route)
+            }
         }
     } else {
         MoreAppsScreen()

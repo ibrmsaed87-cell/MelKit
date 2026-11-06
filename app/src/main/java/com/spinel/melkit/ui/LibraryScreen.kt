@@ -48,6 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -72,6 +73,7 @@ import com.spinel.melkit.storage.GameEntry
 import com.spinel.melkit.storage.GameLibraryState
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.LibraryIssue
+import com.spinel.melkit.storage.LibraryCoversViewModel
 import com.spinel.melkit.storage.LibraryLabel
 import com.spinel.melkit.storage.LibraryOrganizationViewModel
 import com.spinel.melkit.storage.NewFileRestore
@@ -82,12 +84,15 @@ import java.util.Locale
 
 @Composable
 internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, labels: Map<String, LibraryLabel>,
-    organization: LibraryOrganizationViewModel, onOrganize: () -> Unit, onGuide: () -> Unit) {
+    organization: LibraryOrganizationViewModel, covers: LibraryCoversViewModel,
+    onOrganize: () -> Unit, onGuide: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
     val numbers = NumberFormat.getIntegerInstance(locale)
     val listState = rememberLazyListState()
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingCover by rememberSaveable { mutableStateOf<String?>(null) }
+    val coverRevision by covers.revision.collectAsState()
     LaunchedEffect(state.path, state.offset) { listState.scrollToItem(0) }
     BackHandler(enabled = state.path.isNotEmpty() && state.connected && !state.busy && state.proof == null) {
         model.browse(state.path.substringBeforeLast('/', ""))
@@ -160,11 +165,11 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
                 }
             }
             items(state.entries, key = { it.path }) { entry ->
-                val edit: (() -> Unit)? = if (entry.regular && NewFileRestore.supported(entry.path)) {
-                    { editing = entry.path }
-                } else null
+                val supported = entry.regular && NewFileRestore.supported(entry.path)
                 EntryCard(entry, labels[entry.path], state.connected && !state.busy, model, state.connected, state.previewRevision,
-                    onOrganize = edit,
+                    covers = covers, coverRevision = coverRevision,
+                    onOrganize = if (supported) ({ editing = entry.path }) else null,
+                    onCover = if (supported) ({ editingCover = entry.path }) else null,
                     onOpen = { model.browse(entry.path) },
                     onRead = { model.verifyRead(entry) },
                     onExport = {
@@ -199,6 +204,10 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
         }
     }
     editing?.let { path -> LibraryLabelEditor(path, labels, organization) { editing = null } }
+    editingCover?.let { path ->
+        val existing by produceState<Bitmap?>(null, path, coverRevision) { value = covers.load(path) }
+        CoverEditor(existing, save = { covers.save(path, it) }) { editingCover = null }
+    }
     state.proof?.let { proof ->
         AlertDialog(
             onDismissRequest = model::dismissProof,
@@ -230,13 +239,14 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
 
 @Composable
 private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, model: GameLibraryViewModel,
-    connected: Boolean, previewRevision: Int, onOrganize: (() -> Unit)?, onOpen: () -> Unit,
+    connected: Boolean, previewRevision: Int, covers: LibraryCoversViewModel, coverRevision: Int,
+    onOrganize: (() -> Unit)?, onCover: (() -> Unit)?, onOpen: () -> Unit,
     onRead: () -> Unit, onExport: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
-    val preview by produceState<Bitmap?>(null, entry, connected, previewRevision) {
-        value = null
-        if (connected) value = model.preview(entry, previewRevision)
+    val preview by produceState<Bitmap?>(null, entry, connected, previewRevision, coverRevision) {
+        value = if (onCover != null) covers.load(entry.path) else null
+        if (value == null && connected) value = model.preview(entry, previewRevision)
     }
     val icon = when (entry.type) {
         "folder" -> Icons.Outlined.Folder
@@ -295,6 +305,9 @@ private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, 
                 }
                 if (onOrganize != null) TextButton(onClick = onOrganize, enabled = enabled) {
                     Text(stringResource(R.string.organization_edit))
+                }
+                if (onCover != null) TextButton(onClick = onCover, enabled = enabled) {
+                    Text(stringResource(R.string.cover_edit))
                 }
             }
         }

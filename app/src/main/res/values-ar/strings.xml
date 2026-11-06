@@ -69,6 +69,16 @@
     <string name="organization_save_failed">تعذّر حفظ البيانات. حاول مجددًا.</string>
     <string name="thumbnails">الصور المصغرة</string>
     <string name="thumbnails_description">اختر لقطة شاشة وقصّها لتكون غلافًا للمود أو الحزمة داخل MelKit.</string>
+    <string name="cover_tool_help">اضغط «تعديل الغلاف» على بطاقة ملف في المكتبة أو أثناء إنشاء حزمة.</string>
+    <string name="cover_edit">تعديل الغلاف</string>
+    <string name="cover_choose">اختيار صورة</string>
+    <string name="cover_zoom">التكبير</string>
+    <string name="cover_horizontal">الموضع الأفقي</string>
+    <string name="cover_vertical">الموضع العمودي</string>
+    <string name="cover_preview">معاينة الغلاف</string>
+    <string name="cover_remove">إزالة الغلاف المخصّص</string>
+    <string name="cover_read_failed">تعذّرت قراءة هذه الصورة. اختر صورة أخرى.</string>
+    <string name="cover_save_failed">تعذّر حفظ الغلاف. حاول مجددًا.</string>
     <string name="history">سجل العمليات والتراجع</string>
     <string name="history_description">راجع التغييرات وتراجع عن العمليات المدعومة مع الاحتفاظ بالملفات الأصلية.</string>
     <string name="shizuku_guide">شرح إعداد Shizuku</string>

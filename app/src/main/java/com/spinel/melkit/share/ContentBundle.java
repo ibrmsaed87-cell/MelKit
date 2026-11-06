@@ -1,5 +1,6 @@
 package com.spinel.melkit.share;
 
+import com.spinel.melkit.storage.PreviewImages;
 import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
@@ -12,6 +13,8 @@ import java.util.zip.ZipOutputStream;
 public final class ContentBundle {
     private static final String MANIFEST = "MelKit.bundle";
     private static final String VERSION = "MELKIT-BUNDLE-1";
+    private static final String VERSION_WITH_COVER = "MELKIT-BUNDLE-2";
+    static final String COVER_FILE = "MelKit.cover.png";
     public static final long MAX_ARCHIVE = ShareWire.MAX_TOTAL + 64L * 1024 * 1024;
 
     private ContentBundle() {}
@@ -46,7 +49,12 @@ public final class ContentBundle {
     }
 
     public static void write(File archive, List<Source> sources) throws Exception {
+        write(archive, sources, null);
+    }
+
+    public static void write(File archive, List<Source> sources, byte[] cover) throws Exception {
         require(!sources.isEmpty() && sources.size() <= ShareWire.MAX_FILES, "INVALID_FILE");
+        require(cover == null || PreviewImages.validated(cover).length > 0, "INVALID_BUNDLE");
         List<Entry> entries = new ArrayList<>();
         Set<String> paths = new HashSet<>();
         long total = 0;
@@ -68,14 +76,23 @@ public final class ContentBundle {
                 total += size;
                 entries.add(new Entry(source.path, size, digest.digest()));
             }
+            if (cover != null) {
+                zip.putNextEntry(new ZipEntry(COVER_FILE));
+                zip.write(cover);
+                zip.closeEntry();
+            }
             zip.putNextEntry(new ZipEntry(MANIFEST));
             DataOutputStream index = new DataOutputStream(zip);
-            index.writeUTF(VERSION);
+            index.writeUTF(cover == null ? VERSION : VERSION_WITH_COVER);
             index.writeInt(entries.size());
             for (Entry entry : entries) {
                 index.writeUTF(entry.path);
                 index.writeLong(entry.size);
                 index.write(entry.hash);
+            }
+            if (cover != null) {
+                index.writeInt(cover.length);
+                index.write(MessageDigest.getInstance("SHA-256").digest(cover));
             }
             zip.closeEntry();
         }
@@ -104,9 +121,11 @@ public final class ContentBundle {
             Set<String> paths = new HashSet<>();
             long total = 0;
             try (DataInputStream manifest = new DataInputStream(zip.getInputStream(index))) {
-                require(VERSION.equals(manifest.readUTF()), "INVALID_BUNDLE");
+                String version = manifest.readUTF();
+                boolean hasCover = VERSION_WITH_COVER.equals(version);
+                require(hasCover || VERSION.equals(version), "INVALID_BUNDLE");
                 int count = manifest.readInt();
-                require(count > 0 && count <= ShareWire.MAX_FILES && zip.size() == count + 1, "INVALID_BUNDLE");
+                require(count > 0 && count <= ShareWire.MAX_FILES && zip.size() == count + (hasCover ? 2 : 1), "INVALID_BUNDLE");
                 for (int i = 0; i < count; i++) {
                     String path = manifest.readUTF();
                     long size = manifest.readLong();
@@ -119,6 +138,7 @@ public final class ContentBundle {
                     total += size;
                     entries.add(new Entry(path, size, hash));
                 }
+                if (hasCover) readCover(zip, manifest, directory);
                 require(manifest.read() == -1 && total <= ShareWire.MAX_TOTAL, "INVALID_BUNDLE");
             }
             if (directory != null) require(directory.getUsableSpace() >= total, "SPACE");
@@ -138,6 +158,28 @@ public final class ContentBundle {
                 }
             }
             return entries.size();
+        }
+    }
+
+    private static void readCover(ZipFile zip, DataInputStream manifest, File directory) throws Exception {
+        int size = manifest.readInt();
+        byte[] hash = new byte[32];
+        manifest.readFully(hash);
+        ZipEntry entry = zip.getEntry(COVER_FILE);
+        require(size > 0 && size <= PreviewImages.MAX_IMAGE_BYTES && entry != null &&
+                !entry.isDirectory() && entry.getSize() == size, "INVALID_BUNDLE");
+        byte[] bytes = new byte[size];
+        try (DataInputStream input = new DataInputStream(zip.getInputStream(entry))) {
+            input.readFully(bytes);
+            require(input.read() == -1, "INVALID_BUNDLE");
+        }
+        require(MessageDigest.isEqual(hash, MessageDigest.getInstance("SHA-256").digest(bytes)), "CHECKSUM");
+        require(PreviewImages.validated(bytes).length > 0, "INVALID_BUNDLE");
+        if (directory != null) {
+            try (FileOutputStream output = new FileOutputStream(new File(directory, COVER_FILE))) {
+                output.write(bytes);
+                output.getFD().sync();
+            }
         }
     }
 

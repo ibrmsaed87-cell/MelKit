@@ -46,6 +46,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     var page by rememberSaveable { mutableStateOf(if (bundles) "pick" else "menu") }
     var source by rememberSaveable { mutableStateOf("game") }
     var pending by rememberSaveable { mutableStateOf("") }
+    var editingCover by rememberSaveable { mutableStateOf(false) }
     var restore by remember { mutableStateOf<ReceivedFile?>(null) }
     var save by remember { mutableStateOf<ReceivedFile?>(null) }
     val prompt = stringResource(R.string.share_scan_prompt)
@@ -184,6 +185,10 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                             Text(stringResource(R.string.share_queue_count, pageState.queue.size))
                             val canUseSelection = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy
                             if (bundles) {
+                                pageState.draftCover?.let { CoverPreview(it, Modifier.size(88.dp)) }
+                                TextButton(enabled = !pageState.busy, onClick = { editingCover = true }) {
+                                    Text(stringResource(R.string.cover_edit))
+                                }
                                 FilledTonalButton(enabled = canUseSelection, onClick = {
                                     bundleDestination?.launch("MelKit-Bundle.zip")
                                 }) { Text(stringResource(R.string.bundle_create)) }
@@ -329,6 +334,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 }
                 "history", "contents" -> {
                     if (screen == "contents") item {
+                        pageState.receivedCover?.let { CoverPreview(it, Modifier.size(120.dp)) }
                         TextButton(enabled = !pageState.busy, onClick = { page = returnPage }) {
                             Text(stringResource(if (bundles) R.string.bundle_choose else R.string.share_received_files))
                         }
@@ -376,6 +382,9 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 }
             }
         }
+    }
+    if (bundles && editingCover) {
+        CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
     }
     restore?.let { file ->
         AlertDialog(onDismissRequest = { restore = null }, title = { Text(stringResource(R.string.share_import)) },
