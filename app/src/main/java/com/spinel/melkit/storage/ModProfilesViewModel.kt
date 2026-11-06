@@ -85,6 +85,7 @@ class ModProfilesViewModel : ViewModel() {
         run {
             checked(library.profiles("save", JSONObject().put("id", editor.id).put("name", editor.name)
                 .put("paths", JSONArray(editor.selected.toList()))))
+            library.journal.add(if (editor.id == "core") OperationKind.EDIT_CORE else OperationKind.EDIT_GROUP, editor.name)
             mutableState.update { it.copy(editor = null) }
             load(library)
             mutableState.update { it.copy(result = "save") }
@@ -97,6 +98,11 @@ class ModProfilesViewModel : ViewModel() {
         mutableState.update { it.copy(request = null) }
         run {
             val response = library.profiles(request.action, JSONObject().put("id", request.id))
+            if (response.optString("status") == "ok") when (request.action) {
+                "apply" -> library.journal.add(OperationKind.APPLY_GROUP, request.name)
+                "undo" -> library.journal.add(OperationKind.UNDO_GROUP)
+                "delete" -> library.journal.add(OperationKind.DELETE_GROUP, request.name)
+            }
             // Read the journal even when switching fails so recovery controls become available.
             load(library)
             checked(response)

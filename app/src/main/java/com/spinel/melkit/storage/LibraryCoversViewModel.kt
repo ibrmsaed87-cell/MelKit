@@ -16,6 +16,7 @@ import java.security.MessageDigest
 
 internal class LibraryCoversViewModel(application: Application) : AndroidViewModel(application) {
     private val directory = File(application.filesDir, "library-covers")
+    private val journal = OperationJournal.get(application)
     private val mutex = Mutex()
     private val mutableRevision = MutableStateFlow(0)
     val revision = mutableRevision.asStateFlow()
@@ -53,7 +54,10 @@ internal class LibraryCoversViewModel(application: Application) : AndroidViewMod
                     }
                 }
             }.isSuccess
-            if (saved) mutableRevision.update { it + 1 }
+            if (saved) {
+                mutableRevision.update { it + 1 }
+                journal.add(OperationKind.EDIT_COVER, path)
+            }
             saved
         }
     }

@@ -76,6 +76,7 @@ data class GameLibraryState(
 class GameLibraryViewModel(application: Application) : AndroidViewModel(application) {
     private val mutableState = MutableStateFlow(GameLibraryState())
     val state = mutableState.asStateFlow()
+    internal val journal = OperationJournal.get(application)
     @Suppress("DEPRECATION")
     private val storageRoot = Environment.getExternalStorageDirectory().absolutePath
     private var remote: IGameLibrary? = null
@@ -231,9 +232,11 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
             withContext(Dispatchers.IO) {
                 val proof = ParcelFileDescriptor.AutoCloseInputStream(openSource()).use { digest(it) }
                 if (proof.first != expectedBytes) return@withContext "changed"
-                openSource().use { descriptor ->
+                val status = openSource().use { descriptor ->
                     JSONObject(service.restoreFile(storageRoot, path, descriptor, proof.first, proof.second)).getString("status")
                 }
+                if (status == "ok") journal.add(OperationKind.RESTORE, path)
+                status
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -285,18 +288,28 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         return modCall { it.profiles(storageRoot, action, body) }
     }
 
-    suspend fun scanFiles(action: String, payload: JSONObject = JSONObject()): JSONObject =
-        modCall { it.scanFiles(storageRoot, action, payload.toString()) }
+    suspend fun scanFiles(action: String, payload: JSONObject = JSONObject()): JSONObject = modCall(onResult = { result ->
+        if (action == "quarantine") result.optJSONArray("paths")?.let { paths ->
+            journal.add(OperationKind.QUARANTINE, List(paths.length()) { paths.optString(it) }.filter { it.isNotEmpty() })
+        }
+        if (action == "restore" && result.optString("status") == "ok") {
+            result.optString("path").takeIf { it.isNotEmpty() }?.let { journal.add(OperationKind.RETURN_QUARANTINE, it) }
+        }
+    }) { it.scanFiles(storageRoot, action, payload.toString()) }
 
-    suspend fun toggleMod(entry: VaultMod): JSONObject = modCall {
+    suspend fun toggleMod(entry: VaultMod): JSONObject = modCall(onResult = { result ->
+        if (result.optString("status") == "ok") {
+            journal.add(if (entry.id.isEmpty()) OperationKind.DISABLE_MOD else OperationKind.ENABLE_MOD, entry.path)
+        }
+    }) {
         it.toggleMod(storageRoot, entry.path, entry.id, entry.id.isNotEmpty(), entry.bytes, entry.modified)
     }
 
-    private suspend fun modCall(block: (IGameLibrary) -> String): JSONObject {
+    private suspend fun modCall(onResult: (JSONObject) -> Unit = {}, block: (IGameLibrary) -> String): JSONObject {
         if (mutableState.value.busy) return JSONObject().put("status", "busy")
         val service = authorizedService() ?: return JSONObject().put("status", "connect")
         mutableState.update { it.copy(busy = true, issue = null) }
-        return try { withContext(Dispatchers.IO) { JSONObject(block(service)) } }
+        return try { withContext(Dispatchers.IO) { JSONObject(block(service)).also(onResult) } }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { JSONObject().put("status", "incomplete") }
         finally { mutableState.update { it.copy(busy = false, previewRevision = it.previewRevision + 1) } }
@@ -363,6 +376,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                     ReadProof(entry.name, copied.first, copied.second, true, savedPath)
                 }
                 mutableState.update { it.copy(busy = false, proof = proof) }
+                journal.add(OperationKind.COPY, proof.savedPath ?: entry.path)
             } catch (error: Exception) {
                 // Only remove this newly created Downloads copy, never a game file or older copy.
                 // Cleanup also runs after cancellation (for example, leaving the app).

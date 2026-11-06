@@ -234,26 +234,27 @@ class GameLibraryService : IGameLibrary.Stub() {
                     if (selection.any { isModPath(it.path) }) checkModRecovery(storageRoot)
                     scanResult = null
                     val engine = FileScan(gameRoot, GamePreviewReader::validJsonObject)
-                    var moved = 0
+                    val moved = JSONArray()
                     var status = "ok"
                     for (entry in selection) {
                         try {
                             engine.quarantine(entry, quarantine)
-                            moved++
+                            moved.put(entry.path)
                         } catch (error: Exception) {
                             status = scanError(error)
                             break
                         }
                     }
-                    JSONObject().put("moved", moved).put("status", status)
+                    JSONObject().put("moved", moved.length()).put("paths", moved).put("status", status)
                 }
                 "restore" -> {
                     val quarantine = quarantineVault(storageRoot, gameRoot)
                     val id = request.getString("id")
-                    if (isModPath(quarantine.storedPath(id))) checkModRecovery(storageRoot)
+                    val path = quarantine.storedPath(id)
+                    if (isModPath(path)) checkModRecovery(storageRoot)
                     quarantine.enable(id)
                     scanResult = null
-                    JSONObject()
+                    JSONObject().put("path", path)
                 }
                 else -> throw IllegalArgumentException("Unknown scan action")
             }

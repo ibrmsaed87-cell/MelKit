@@ -223,6 +223,8 @@ fun MelKitApp(shareRequest: Int = 0) {
                     }
                 } else if (route == "categories") {
                     LibraryOrganizationScreen(labels, organization) { navigate("library") }
+                } else if (route == "history") {
+                    OperationHistoryScreen(libraryModel, libraryState) { navigate("shizuku") }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -378,7 +380,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
             ToolCard(feature.title, feature.description, feature.icon,
-                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories", "thumbnails")) {
+                planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories", "thumbnails", "history")) {
                 navigate(feature.route)
             }
         }

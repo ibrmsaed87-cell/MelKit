@@ -17,6 +17,8 @@ import com.spinel.melkit.storage.DownloadCopy
 import com.spinel.melkit.storage.CoverPhoto
 import com.spinel.melkit.storage.GameEntry
 import com.spinel.melkit.storage.GameLibraryViewModel
+import com.spinel.melkit.storage.OperationJournal
+import com.spinel.melkit.storage.OperationKind
 import com.spinel.melkit.storage.PreviewBitmap
 import com.spinel.melkit.storage.PreviewImages
 import com.spinel.melkit.storage.SavedCopy
@@ -45,6 +47,7 @@ internal data class SharePage(val queue: List<ShareInput> = emptyList(), val rec
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application
+    private val journal = OperationJournal.get(application)
     private val mutableState = MutableStateFlow(SharePage())
     val state = mutableState.asStateFlow()
     val transfer = MelKitShareService.state
@@ -267,7 +270,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                     java.security.DigestInputStream(input, readBack).use { it.copyTo(DiscardOutput) }
                 }
                 check(bytes == item.bytes && count == bytes && MessageDigest.isEqual(sent.digest(), readBack.digest())) { "CHECKSUM" }
-                copy.publish()
+                journal.add(OperationKind.COPY, copy.publish())
             } catch (error: Exception) {
                 runCatching { copy.remove() }
                 throw error

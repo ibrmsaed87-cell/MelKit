@@ -19,6 +19,7 @@ internal data class LibraryLabel(val name: String = "", val category: String = "
 /** Display metadata is keyed by game path. Only MelKit's private preferences are edited. */
 internal class LibraryOrganizationViewModel(application: Application) : AndroidViewModel(application) {
     private val preferences = application.getSharedPreferences("library-organization", Context.MODE_PRIVATE)
+    private val journal = OperationJournal.get(application)
     private val mutex = Mutex()
     private val mutableLabels = MutableStateFlow(preferences.all.mapNotNull { (path, value) ->
         if (value !is String || !NewFileRestore.supported(path)) return@mapNotNull null
@@ -34,11 +35,13 @@ internal class LibraryOrganizationViewModel(application: Application) : AndroidV
         mutex.withLock {
             if (!NewFileRestore.supported(path)) return@withLock false
             val label = LibraryLabel(name.trim().take(MAX_LABEL_LENGTH), category.trim().take(MAX_LABEL_LENGTH))
+            if ((mutableLabels.value[path] ?: LibraryLabel()) == label) return@withLock true
             val editor = preferences.edit()
             if (label.empty) editor.remove(path)
             else editor.putString(path, JSONObject().put("name", label.name).put("category", label.category).toString())
             if (!runCatching { editor.commit() }.getOrDefault(false)) return@withLock false
             mutableLabels.update { if (label.empty) it - path else it + (path to label) }
+            journal.add(OperationKind.ORGANIZE, path)
             true
         }
     }
