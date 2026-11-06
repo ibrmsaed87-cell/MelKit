@@ -3,6 +3,7 @@ package com.spinel.melkit.storage
 import android.util.JsonReader
 import android.util.JsonToken
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.File
 import java.io.InputStreamReader
 import java.io.InputStream
@@ -10,6 +11,17 @@ import java.util.Locale
 
 /** Reads only the preview; a missing/unsupported preview says nothing about file validity. */
 internal object GamePreviewReader {
+    fun validJsonObject(bytes: ByteArray, start: Int): Boolean = try {
+        val input = bytes.inputStream(start, bytes.size - start)
+        JsonReader(InputStreamReader(input, Charsets.UTF_8.newDecoder())).use { reader ->
+            if (reader.peek() != JsonToken.BEGIN_OBJECT) false else {
+                reader.skipValue()
+                reader.peek() == JsonToken.END_DOCUMENT
+            }
+        }
+    } catch (_: IOException) { false }
+    catch (_: IllegalStateException) { false }
+
     fun read(file: File): ByteArray = when (file.extension.lowercase(Locale.ROOT)) {
         "melmap" -> PreviewImages.readMap(file)
         "melworld" -> PreviewImages.readWorld(file)
@@ -54,3 +66,4 @@ internal object GamePreviewReader {
         return byteArrayOf()
     }
 }
+

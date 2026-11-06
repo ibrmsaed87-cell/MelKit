@@ -32,7 +32,7 @@
     <string name="last_backup">Latest backup</string>
     <string name="no_backup">No backup yet</string>
     <string name="view">View</string>
-    <string name="preview_notice">Browse, save and restore game content, toggle mods and switch groups. Phone transfer and file checks are still in preparation.</string>
+    <string name="preview_notice">Browse, back up, restore and check game files. Manage individual mods and switch groups.</string>
     <string name="in_preparation">In preparation</string>
     <string name="library_description">Browse mods, maps, and saves with search, sorting, and multiple selection.</string>
     <string name="library_empty">Your content will appear here</string>
@@ -201,6 +201,37 @@
     <string name="profile_error">Could not complete the operation. Reconnect Shizuku and refresh the groups. Check whether Restore previous state is available before retrying.</string>
     <string name="profile_home_connect">Connect Shizuku to check the current group.</string>
     <string name="profile_home_check">Open groups to check the current state.</string>
+    <string name="scan_results_tab">Scan results</string>
+    <string name="scan_vault_tab">Quarantined files</string>
+    <string name="scan_start">Start scan</string>
+    <string name="scan_summary">Files reviewed %1$d · Findings %2$d</string>
+    <string name="scan_clear">The scan found no files that need review.</string>
+    <string name="scan_partial">Some folders could not be fully checked. Review the available results.</string>
+    <string name="scan_empty_file">Empty file</string>
+    <string name="scan_duplicate">Duplicate content</string>
+    <string name="scan_invalid">Structure error in a supported format</string>
+    <string name="scan_unreadable">Could not read this entry</string>
+    <string name="scan_unsupported">Format could not be verified</string>
+    <string name="scan_limit">Content exceeds the scan limits.</string>
+    <string name="scan_reference">Matching reference file</string>
+    <string name="scan_retained">Kept as the reference for matching files</string>
+    <string name="scan_select">Select for quarantine</string>
+    <string name="scan_isolate_selected">Quarantine selected (%1$d)</string>
+    <string name="scan_batch_limit">You can quarantine up to 40 files per operation.</string>
+    <string name="scan_confirm_isolate">Close Melon Sandbox completely. MelKit will verify a recovery copy before moving each selected file out of the game.</string>
+    <string name="scan_vault_description">Quarantined files are kept in Download/MelKit/Quarantine. You can return each file to its original path.</string>
+    <string name="scan_vault_empty">No quarantined files.</string>
+    <string name="scan_vault_recovery">Recovery copy from an interrupted operation</string>
+    <string name="scan_restore">Return file to game</string>
+    <string name="scan_confirm_restore">Close Melon Sandbox completely. The file will return to its original path after its contents are verified.</string>
+    <string name="scan_moved">Files quarantined %1$d</string>
+    <string name="scan_restored">The file is available at its original path.</string>
+    <string name="scan_expired">These scan results are out of date. Start a new scan.</string>
+    <string name="scan_changed">A file or its reference changed. Refresh the list or start a new scan.</string>
+    <string name="scan_exists">A different file occupies the original path. Both copies were kept.</string>
+    <string name="scan_missing">The game folder or requested file is unavailable.</string>
+    <string name="scan_denied">Access was blocked. Check the Shizuku connection and try again.</string>
+    <string name="scan_incomplete">The operation did not finish. Refresh Quarantined files to check available recovery copies.</string>
 </resources>
 
 

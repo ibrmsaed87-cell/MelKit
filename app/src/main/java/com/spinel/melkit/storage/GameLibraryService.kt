@@ -8,6 +8,7 @@ import android.system.OsConstants
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.Locale
 import java.util.UUID
@@ -19,6 +20,9 @@ class GameLibraryService : IGameLibrary.Stub() {
     private var choiceRoot = ""
     private var choiceStarted = 0L
     private var choiceSnapshot: List<ModVault.Item> = emptyList()
+    private var scanResult: FileScan.Result? = null
+    private var scanToken = ""
+    private var scanRoot = ""
     override fun destroy() { exitProcess(0) }
 
     private fun paths(storageRoot: String): ContentPaths {
@@ -71,9 +75,7 @@ class GameLibraryService : IGameLibrary.Stub() {
             try {
                 val policy = paths(storageRoot)
                 policy.resolve(relativePath, false)
-                if (relativePath.startsWith("Mods/", ignoreCase = true)) {
-                    ModProfiles(vault(storageRoot), File(File(storageRoot).canonicalFile, "Download/MelKit/ModProfiles")).requireIdle()
-                }
+                if (isModPath(relativePath)) checkModRecovery(storageRoot)
                 NewFileRestore.restore(policy.resolve("", true), relativePath, input, expectedBytes, expectedSha)
                 JSONObject().put("status", "ok").toString()
             } catch (_: ModProfiles.NeedsRecovery) {
@@ -192,11 +194,119 @@ class GameLibraryService : IGameLibrary.Stub() {
     }
 
     @Synchronized
+    override fun scanFiles(storageRoot: String, action: String, payload: String): String {
+        return try {
+            require(payload.length <= 32_768)
+            val request = JSONObject(payload)
+            val gameRoot = paths(storageRoot).resolve("", true)
+            val result = when (action) {
+                "start" -> {
+                    scanResult = null
+                    val found = FileScan(gameRoot, GamePreviewReader::validJsonObject).run()
+                    scanResult = found
+                    scanRoot = storageRoot
+                    scanToken = UUID.randomUUID().toString()
+                    scanPage(found, 0)
+                }
+                "page" -> {
+                    val found = currentScan(storageRoot, request) ?: return scanStatus("expired")
+                    scanPage(found, request.getInt("offset"))
+                }
+                "vault" -> {
+                    val offset = request.optInt("offset", 0)
+                    require(offset >= 0)
+                    val stored = quarantineVault(storageRoot, gameRoot).stored()
+                    val entries = JSONArray()
+                    stored.items.drop(offset).take(PAGE_SIZE).forEach { item ->
+                        entries.put(JSONObject().put("id", item.id).put("path", item.path)
+                            .put("size", item.bytes).put("state", item.state))
+                    }
+                    JSONObject().put("entries", entries).put("total", stored.items.size).put("warnings", stored.warnings)
+                        .put("offset", offset).put("next", offset + entries.length() < stored.items.size)
+                }
+                "quarantine" -> {
+                    val found = currentScan(storageRoot, request) ?: return scanStatus("expired")
+                    val indices = request.getJSONArray("indices")
+                    require(indices.length() in 1..PAGE_SIZE)
+                    val selection = (0 until indices.length()).map { found.findings[indices.getInt(it)] }
+                    require(selection.distinct().size == indices.length() && selection.all { it.selectable })
+                    val quarantine = quarantineVault(storageRoot, gameRoot)
+                    if (selection.any { isModPath(it.path) }) checkModRecovery(storageRoot)
+                    scanResult = null
+                    val engine = FileScan(gameRoot, GamePreviewReader::validJsonObject)
+                    var moved = 0
+                    var status = "ok"
+                    for (entry in selection) {
+                        try {
+                            engine.quarantine(entry, quarantine)
+                            moved++
+                        } catch (error: Exception) {
+                            status = scanError(error)
+                            break
+                        }
+                    }
+                    JSONObject().put("moved", moved).put("status", status)
+                }
+                "restore" -> {
+                    val quarantine = quarantineVault(storageRoot, gameRoot)
+                    val id = request.getString("id")
+                    if (isModPath(quarantine.storedPath(id))) checkModRecovery(storageRoot)
+                    quarantine.enable(id)
+                    scanResult = null
+                    JSONObject()
+                }
+                else -> throw IllegalArgumentException("Unknown scan action")
+            }
+            if (!result.has("status")) result.put("status", "ok")
+            val body = result.toString()
+            if (body.length > 400_000) scanStatus("limit") else body
+        } catch (error: Exception) { scanStatus(scanError(error)) }
+    }
+
+    private fun currentScan(storageRoot: String, request: JSONObject): FileScan.Result? =
+        scanResult?.takeIf { scanRoot == storageRoot && scanToken == request.optString("token") }
+
+    private fun scanPage(result: FileScan.Result, offset: Int): JSONObject {
+        require(offset >= 0)
+        val entries = JSONArray()
+        result.findings.drop(offset).take(PAGE_SIZE).forEachIndexed { index, item ->
+            entries.put(JSONObject().put("index", offset + index).put("path", item.path).put("issue", item.issue)
+                .put("reference", item.reference).put("size", item.bytes).put("selectable", item.selectable)
+                .put("retained", item.retained))
+        }
+        return JSONObject().put("entries", entries).put("token", scanToken).put("files", result.files)
+            .put("total", result.findings.size).put("partial", result.partial).put("offset", offset)
+            .put("next", offset + entries.length() < result.findings.size)
+    }
+
+    private fun quarantineVault(storageRoot: String, gameRoot: File): ModVault = ModVault.forQuarantine(
+        gameRoot, File(File(storageRoot).canonicalFile, "Download/MelKit/Quarantine"),
+    )
+
+    private fun isModPath(path: String) = path.startsWith("Mods/", ignoreCase = true)
+
+    private fun checkModRecovery(storageRoot: String, manager: ModVault = vault(storageRoot)) {
+        ModProfiles(manager, File(File(storageRoot).canonicalFile, "Download/MelKit/ModProfiles")).requireIdle()
+    }
+
+    private fun scanStatus(status: String) = JSONObject().put("status", status).toString()
+
+    private fun scanError(error: Exception): String = when (error) {
+        is ModVault.Changed, is NewFileRestore.SourceChanged -> "changed"
+        is ModVault.Conflict, is NewFileRestore.AlreadyExists -> "exists"
+        is ModVault.NoSpace -> "space"
+        is ModProfiles.NeedsRecovery -> "recovery"
+        is SecurityException -> "denied"
+        is FileNotFoundException -> "missing"
+        else -> "incomplete"
+    }
+
+    @Synchronized
     override fun toggleMod(storageRoot: String, relativePath: String, vaultId: String, enable: Boolean,
         expectedBytes: Long, expectedModified: Long): String {
         val status = try {
             val manager = vault(storageRoot)
-            ModProfiles(manager, File(File(storageRoot).canonicalFile, "Download/MelKit/ModProfiles")).requireIdle()
+            checkModRecovery(storageRoot, manager)
             if (enable) manager.enable(vaultId) else manager.disable(relativePath, expectedBytes, expectedModified)
             "ok"
         } catch (_: ModProfiles.NeedsRecovery) { "recovery"

@@ -274,6 +274,9 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         return modCall { it.profiles(storageRoot, action, body) }
     }
 
+    suspend fun scanFiles(action: String, payload: JSONObject = JSONObject()): JSONObject =
+        modCall { it.scanFiles(storageRoot, action, payload.toString()) }
+
     suspend fun toggleMod(entry: VaultMod): JSONObject = modCall {
         it.toggleMod(storageRoot, entry.path, entry.id, entry.id.isNotEmpty(), entry.bytes, entry.modified)
     }

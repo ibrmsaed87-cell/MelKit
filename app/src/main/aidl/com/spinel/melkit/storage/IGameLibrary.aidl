@@ -16,6 +16,7 @@ interface IGameLibrary {
         long expectedBytes, long expectedModified) = 7;
     byte[] readModPreview(String storageRoot, String relativePath, String vaultId) = 8;
     String profiles(String storageRoot, String action, String payload) = 9;
+    String scanFiles(String storageRoot, String action, String payload) = 10;
 }
 
 

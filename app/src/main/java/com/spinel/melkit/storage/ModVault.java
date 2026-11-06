@@ -3,11 +3,14 @@ package com.spinel.melkit.storage;
 import java.io.*;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.function.Predicate;
 
 /** Verified mod moves with a durable journal in shared storage. Never overwrites game files. */
 public final class ModVault {
     private static final int MAX_ITEMS = 5000;
     private final File gameRoot, vaultRoot;
+    private final Predicate<String> supported;
+    private final String payloadName;
     public interface SpaceProbe { long available(File directory); }
     private final SpaceProbe space;
     public static class Conflict extends IOException {}
@@ -37,17 +40,29 @@ public final class ModVault {
     }
 
     public ModVault(File gameRoot, File vaultRoot, SpaceProbe space) throws IOException {
+        this(gameRoot, vaultRoot, space,
+                path -> NewFileRestore.supported(path) && path.regionMatches(true, 0, "Mods/", 0, 5),
+                "content.melmod");
+    }
+
+    static ModVault forQuarantine(File gameRoot, File vaultRoot) throws IOException {
+        return new ModVault(gameRoot, vaultRoot, File::getUsableSpace, NewFileRestore::supported, "content.bin");
+    }
+
+    private ModVault(File gameRoot, File vaultRoot, SpaceProbe space, Predicate<String> supported,
+            String payloadName) throws IOException {
         this.gameRoot = gameRoot.getCanonicalFile();
         this.vaultRoot = vaultRoot.getAbsoluteFile();
         this.space = space;
+        this.supported = supported;
+        this.payloadName = payloadName;
         if (!this.vaultRoot.equals(this.vaultRoot.getCanonicalFile())) throw new SecurityException("Vault symlink");
         String game = this.gameRoot.getPath() + File.separator;
         if (this.vaultRoot.equals(this.gameRoot) || this.vaultRoot.getPath().startsWith(game)) throw new SecurityException("Vault inside game");
     }
 
-    private File mod(String path) throws IOException {
-        if (path == null || !path.toLowerCase(Locale.ROOT).startsWith("mods/")
-                || !path.toLowerCase(Locale.ROOT).endsWith(".melmod")) throw new SecurityException("Not a mod");
+    private File contentFile(String path) throws IOException {
+        if (!supported.test(path)) throw new SecurityException("Unsupported content path");
         File file = new ContentPaths(gameRoot).resolve(path, false);
         if (!file.equals(new File(gameRoot, path).getAbsoluteFile())) throw new SecurityException("Mod symlink");
         return file;
@@ -76,14 +91,14 @@ public final class ModVault {
 
     private Record read(String id) throws IOException {
         File journal = child(id, "record.properties");
-        if (!journal.isFile() || journal.length() > 16384) throw new IOException("Unreadable journal");
+        if (!journal.isFile() || journal.length() > 32768) throw new IOException("Unreadable journal");
         Properties p = new Properties();
         try (InputStream input = new FileInputStream(journal)) { p.load(input); }
         Record r = new Record();
         r.id = id; r.path = p.getProperty("path"); r.hash = p.getProperty("sha256"); r.state = p.getProperty("state");
         try { r.bytes = Long.parseLong(p.getProperty("bytes", "-1")); }
         catch (NumberFormatException error) { throw new IOException("Invalid journal", error); }
-        mod(r.path);
+        contentFile(r.path);
         if (r.bytes < 0 || r.hash == null || !r.hash.matches("[a-f0-9]{64}")
                 || !Arrays.asList("copying", "prepared", "disabled", "enabled").contains(r.state)) {
             throw new IOException("Invalid journal");
@@ -99,7 +114,7 @@ public final class ModVault {
         p.setProperty("bytes", Long.toString(r.bytes)); p.setProperty("state", state);
         File temporary = File.createTempFile(".journal-", ".tmp", directory);
         try {
-            try (FileOutputStream output = new FileOutputStream(temporary)) { p.store(output, "MelKit mod vault"); output.getFD().sync(); }
+            try (FileOutputStream output = new FileOutputStream(temporary)) { p.store(output, "MelKit file vault"); output.getFD().sync(); }
             if (!temporary.renameTo(child(r.id, "record.properties"))) throw new IOException("Cannot publish journal");
             r.state = state;
         } finally { if (temporary.exists()) temporary.delete(); }
@@ -110,6 +125,20 @@ public final class ModVault {
         Snapshot snapshot = new Snapshot();
         File mods = new File(gameRoot, "Mods");
         if (mods.exists()) active(mods, "Mods", snapshot.items, 0);
+        appendStored(snapshot);
+        snapshot.items.sort(Comparator.comparing((Item i) -> i.id.isEmpty() ? 0 : 1)
+                .thenComparing(i -> i.path.toLowerCase(Locale.ROOT)).thenComparing(i -> i.id));
+        return snapshot;
+    }
+
+    Snapshot stored() throws Exception {
+        Snapshot snapshot = new Snapshot();
+        appendStored(snapshot);
+        snapshot.items.sort(Comparator.comparing((Item i) -> i.path.toLowerCase(Locale.ROOT)).thenComparing(i -> i.id));
+        return snapshot;
+    }
+
+    private void appendStored(Snapshot snapshot) throws Exception {
         checkVault();
         if (vaultRoot.exists()) {
             File[] directories = vaultRoot.listFiles();
@@ -119,16 +148,13 @@ public final class ModVault {
                 try {
                     Record r = read(directory.getName());
                     if ("enabled".equals(r.state)) continue;
-                    File content = child(r.id, "content.melmod");
+                    File content = child(r.id, payloadName);
                     if (!content.isFile() || content.length() != r.bytes) { snapshot.warnings++; continue; }
-                    snapshot.items.add(new Item(r.id, r.path, "disabled".equals(r.state) && !mod(r.path).exists() ? "disabled" : "recovery",
+                    snapshot.items.add(new Item(r.id, r.path, "disabled".equals(r.state) && !contentFile(r.path).exists() ? "disabled" : "recovery",
                             r.bytes, content.lastModified()));
                 } catch (Exception error) { snapshot.warnings++; }
             }
         }
-        snapshot.items.sort(Comparator.comparing((Item i) -> i.id.isEmpty() ? 0 : 1)
-                .thenComparing(i -> i.path.toLowerCase(Locale.ROOT)).thenComparing(i -> i.id));
-        return snapshot;
     }
 
     private void active(File directory, String path, List<Item> items, int depth) throws Exception {
@@ -141,7 +167,7 @@ public final class ModVault {
             if (!file.getAbsoluteFile().equals(file.getCanonicalFile())) throw new SecurityException("Mod symlink");
             if (file.isDirectory()) active(file, relative, items, depth + 1);
             else if (file.isFile() && file.getName().toLowerCase(Locale.ROOT).endsWith(".melmod")) {
-                mod(relative);
+                contentFile(relative);
                 if (items.size() >= MAX_ITEMS) throw new IOException("Mod list too large");
                 items.add(new Item("", relative, "active", file.length(), file.lastModified()));
             }
@@ -149,10 +175,15 @@ public final class ModVault {
     }
 
     public String disable(String path, long expectedBytes, long expectedModified) throws Exception {
-        File source = mod(path);
+        return disable(path, expectedBytes, expectedModified, null);
+    }
+
+    String disable(String path, long expectedBytes, long expectedModified, String expectedHash) throws Exception {
+        File source = contentFile(path);
         if (!source.isFile() || source.length() != expectedBytes || source.lastModified() != expectedModified) throw new Changed();
         Record r = new Record();
-        r.id = UUID.randomUUID().toString(); r.path = path; r.bytes = expectedBytes; r.hash = hash(source);
+        r.id = UUID.randomUUID().toString(); r.path = path; r.bytes = expectedBytes; r.hash = hash(source, r.bytes);
+        if (expectedHash != null && !expectedHash.equals(r.hash)) throw new Changed();
         checkVault();
         if (!vaultRoot.isDirectory() && !vaultRoot.mkdirs()) throw new IOException("Cannot create vault");
         // Keep headroom for the journal and a full verified copy. Zero means the query failed.
@@ -165,7 +196,7 @@ public final class ModVault {
                 Record previous = read(directory.getName());
                 if ("enabled".equals(previous.state) && previous.path.equals(path)
                         && previous.bytes == r.bytes && previous.hash.equals(r.hash)) {
-                    verify(child(previous.id, "content.melmod"), previous);
+                    verify(child(previous.id, payloadName), previous);
                     r = previous; break;
                 }
             } catch (Exception ignored) { /* Do not alter unreadable older records. */ }
@@ -185,11 +216,11 @@ public final class ModVault {
                 output.getFD().sync();
             }
             verify(temporary, r);
-            if (!temporary.renameTo(child(r.id, "content.melmod"))) throw new IOException("Cannot publish vault copy");
+            if (!temporary.renameTo(child(r.id, payloadName))) throw new IOException("Cannot publish vault copy");
         }
         write(r, "prepared"); // A crash after this point leaves a discoverable, recoverable copy.
-        verify(child(r.id, "content.melmod"), r);
-        source = mod(path);
+        verify(child(r.id, payloadName), r);
+        source = contentFile(path);
         if (source.lastModified() != expectedModified) throw new Changed();
         verify(source, r);
         if (!source.delete()) throw new Incomplete();
@@ -200,12 +231,12 @@ public final class ModVault {
 
     public void enable(String id) throws Exception {
         Record r = read(id);
-        File payload = child(id, "content.melmod");
+        File payload = child(id, payloadName);
         verify(payload, r);
-        File target = mod(r.path);
+        File target = contentFile(r.path);
         if (target.exists()) {
             // Idempotent recovery after a completed copy and an interrupted journal update.
-            if (!target.isFile() || target.length() != r.bytes || !hash(target).equals(r.hash)) throw new Conflict();
+            if (!target.isFile() || target.length() != r.bytes || !hash(target, r.bytes).equals(r.hash)) throw new Conflict();
         } else {
             File space = target.getParentFile();
             while (space != null && !space.exists()) space = space.getParentFile();
@@ -214,44 +245,53 @@ public final class ModVault {
                 NewFileRestore.restore(gameRoot, r.path, input, r.bytes, r.hash);
             }
         }
-        verify(mod(r.path), r);
+        verify(contentFile(r.path), r);
         write(r, "enabled");
         // Keep the verified safety copy. Repeated toggles reuse it instead of creating duplicates.
     }
 
     public File previewFile(String id) throws Exception {
         read(id);
-        File file = child(id, "content.melmod");
+        File file = child(id, payloadName);
         if (!file.isFile()) throw new IOException("Vault copy unavailable");
         return file;
     }
 
-    public void validateModPath(String path) throws IOException { mod(path); }
+    public void validateModPath(String path) throws IOException { contentFile(path); }
+
+    String storedPath(String id) throws IOException { return read(id).path; }
 
     /** Fingerprints are checked against fresh metadata before a batch touches a file. */
     public String fingerprint(Item item) throws Exception {
         if (!item.id.isEmpty()) {
             Record r = read(item.id);
             if (!r.path.equals(item.path)) throw new Changed();
-            verify(child(item.id, "content.melmod"), r);
+            verify(child(item.id, payloadName), r);
             return r.hash;
         }
-        File file = mod(item.path);
+        File file = contentFile(item.path);
         if (!file.isFile() || file.length() != item.bytes || file.lastModified() != item.modified) throw new Changed();
-        String result = hash(file);
+        String result = hash(file, item.bytes);
         if (file.length() != item.bytes || file.lastModified() != item.modified) throw new Changed();
         return result;
     }
 
     private static void verify(File file, Record r) throws Exception {
-        if (!file.isFile() || file.length() != r.bytes || !hash(file).equals(r.hash)) throw new Changed();
+        if (!file.isFile() || file.length() != r.bytes || !hash(file, r.bytes).equals(r.hash)) throw new Changed();
     }
-    private static String hash(File file) throws Exception {
+    static String hash(File file, long expectedBytes) throws Exception {
         MessageDigest sha = MessageDigest.getInstance("SHA-256");
+        long bytes = 0;
         try (InputStream input = new FileInputStream(file)) {
-            byte[] buffer = new byte[65536]; int count;
-            while ((count = input.read(buffer)) != -1) sha.update(buffer, 0, count);
+            byte[] buffer = new byte[65536];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                bytes += count;
+                if (bytes > expectedBytes) throw new Changed();
+                sha.update(buffer, 0, count);
+            }
         }
+        if (bytes != expectedBytes) throw new Changed();
         StringBuilder result = new StringBuilder();
         for (byte value : sha.digest()) result.append(String.format(Locale.ROOT, "%02x", value & 255));
         return result.toString();

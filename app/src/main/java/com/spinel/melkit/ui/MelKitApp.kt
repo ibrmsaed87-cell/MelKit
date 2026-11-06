@@ -93,6 +93,7 @@ import com.spinel.melkit.storage.SavedCopiesViewModel
 import com.spinel.melkit.storage.ModVaultViewModel
 import com.spinel.melkit.storage.ModProfilesViewModel
 import com.spinel.melkit.storage.ModProfilesState
+import com.spinel.melkit.storage.FileScanViewModel
 import kotlinx.coroutines.flow.first
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
@@ -127,6 +128,8 @@ fun MelKitApp() {
     val vaultState by vaultModel.state.collectAsState()
     val profilesModel: ModProfilesViewModel = viewModel()
     val profilesState by profilesModel.state.collectAsState()
+    val scanModel: FileScanViewModel = viewModel()
+    val scanState by scanModel.state.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -195,6 +198,8 @@ fun MelKitApp() {
                     ModVaultScreen(vaultState, vaultModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else if (route == "profiles") {
                     ModProfilesScreen(profilesState, profilesModel, libraryModel, libraryState) { navigate("shizuku") }
+                } else if (route == "scanner") {
+                    FileScanScreen(scanState, scanModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else {
                     Column(
                         Modifier.widthIn(max = 680.dp).fillMaxWidth()
@@ -353,7 +358,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
     if (selected == 0) {
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
         features.forEach { feature ->
-            ToolCard(feature.title, feature.description, feature.icon, planned = feature.route !in listOf("toggles", "profiles")) { navigate(feature.route) }
+            ToolCard(feature.title, feature.description, feature.icon, planned = feature.route !in listOf("toggles", "profiles", "scanner")) { navigate(feature.route) }
         }
     } else {
         MoreAppsScreen()

@@ -28,7 +28,7 @@
     <string name="last_backup">آخر نسخة احتياطية</string>
     <string name="no_backup">لا توجد نسخة احتياطية بعد</string>
     <string name="view">عرض</string>
-    <string name="preview_notice">تصفّح محتوى اللعبة واحفظه واستعده، وتحكّم بالمودات وبدّل مجموعاتها. المشاركة بين الهاتفين وفحص الملفات قيد التجهيز.</string>
+    <string name="preview_notice">تصفّح ملفات اللعبة وافحصها واحفظها واستعدها. تحكّم بالمودات وبدّل مجموعاتها.</string>
     <string name="in_preparation">قيد التجهيز</string>
     <string name="library_description">تصفّح المودات والخرائط وملفات الحفظ مع البحث والفرز والتحديد المتعدد.</string>
     <string name="library_empty">سيظهر محتواك هنا</string>
@@ -194,6 +194,37 @@
     <string name="profile_error">تعذّر إكمال العملية. أعد ربط Shizuku وحدّث المجموعات. تحقق من توفر استعادة الحالة السابقة قبل المحاولة مجددًا.</string>
     <string name="profile_home_connect">اربط Shizuku للتحقق من المجموعة الحالية.</string>
     <string name="profile_home_check">افتح المجموعات للتحقق من الحالة الحالية.</string>
+    <string name="scan_results_tab">نتائج الفحص</string>
+    <string name="scan_vault_tab">الملفات المعزولة</string>
+    <string name="scan_start">بدء الفحص</string>
+    <string name="scan_summary">الملفات التي روجعت %1$d · النتائج %2$d</string>
+    <string name="scan_clear">لم يعثر الفحص على ملفات تحتاج إلى مراجعة.</string>
+    <string name="scan_partial">تعذّر إكمال فحص بعض المجلدات. راجع النتائج المتاحة.</string>
+    <string name="scan_empty_file">ملف فارغ</string>
+    <string name="scan_duplicate">محتوى مكرر</string>
+    <string name="scan_invalid">خطأ في بنية صيغة مدعومة</string>
+    <string name="scan_unreadable">تعذّرت قراءة هذا العنصر</string>
+    <string name="scan_unsupported">تعذّر التحقق من الصيغة</string>
+    <string name="scan_limit">يتجاوز المحتوى حدود الفحص.</string>
+    <string name="scan_reference">الملف المرجعي المطابق</string>
+    <string name="scan_retained">يُحتفظ به مرجعًا للملفات المطابقة</string>
+    <string name="scan_select">اختيار للعزل</string>
+    <string name="scan_isolate_selected">عزل المحدد (%1$d)</string>
+    <string name="scan_batch_limit">يمكنك عزل ما يصل إلى 40 ملفًا في العملية الواحدة.</string>
+    <string name="scan_confirm_isolate">أغلق Melon Sandbox بالكامل. سيتحقق MelKit من نسخة قابلة للاستعادة قبل نقل كل ملف محدد خارج اللعبة.</string>
+    <string name="scan_vault_description">تُحفظ الملفات المعزولة في Download/MelKit/Quarantine. يمكنك إعادة كل ملف إلى مساره الأصلي.</string>
+    <string name="scan_vault_empty">لا توجد ملفات معزولة.</string>
+    <string name="scan_vault_recovery">نسخة قابلة للاسترجاع من عملية توقفت قبل اكتمالها</string>
+    <string name="scan_restore">إعادة الملف إلى اللعبة</string>
+    <string name="scan_confirm_restore">أغلق Melon Sandbox بالكامل. سيعود الملف إلى مساره الأصلي بعد التحقق من محتواه.</string>
+    <string name="scan_moved">الملفات التي عُزلت %1$d</string>
+    <string name="scan_restored">الملف متاح في مساره الأصلي.</string>
+    <string name="scan_expired">نتائج الفحص قديمة. ابدأ فحصًا جديدًا.</string>
+    <string name="scan_changed">تغيّر ملف أو مرجعه. حدّث القائمة أو ابدأ فحصًا جديدًا.</string>
+    <string name="scan_exists">يوجد ملف مختلف في المسار الأصلي. حُفظت النسختان.</string>
+    <string name="scan_missing">مجلد اللعبة أو الملف المطلوب غير متاح.</string>
+    <string name="scan_denied">تعذّر الوصول. تحقق من اتصال Shizuku وحاول مجددًا.</string>
+    <string name="scan_incomplete">لم تكتمل العملية. حدّث الملفات المعزولة للتحقق من النسخ المتاحة للاسترجاع.</string>
 </resources>
 
 
