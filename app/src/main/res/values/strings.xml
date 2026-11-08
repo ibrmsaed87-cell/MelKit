@@ -335,6 +335,10 @@
     <string name="share_split_apk">This installation uses multiple APK files. Share the project link instead.</string>
     <string name="share_failed">The operation stopped. Check Received files before starting with a new QR.</string>
     <string name="share_finishing">Closing the direct connection</string>
+    <string name="history_last_group_switch">Last group switch</string>
+    <string name="history_group_switch_summary">From %1$s to %2$s</string>
+    <string name="history_previous_mod_state">previous mod state</string>
+    <string name="history_selected_group">selected group</string>
 </resources>
 
 

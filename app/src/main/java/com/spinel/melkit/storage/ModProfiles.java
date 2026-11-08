@@ -23,11 +23,14 @@ public final class ModProfiles {
     public static final class State {
         public final List<Profile> profiles;
         public final Set<String> core;
-        public final String activeId;
+        public final String activeId, previousName, targetName;
+        public final long switchedAt;
         public final boolean undo, recovery;
         public final int warnings;
-        State(List<Profile> profiles, Set<String> core, String activeId, boolean undo, boolean recovery, int warnings) {
+        State(List<Profile> profiles, Set<String> core, String activeId, boolean undo, boolean recovery, int warnings,
+                String previousName, String targetName, long switchedAt) {
             this.profiles = profiles; this.core = core; this.activeId = activeId; this.undo = undo; this.recovery = recovery; this.warnings = warnings;
+            this.previousName = previousName; this.targetName = targetName; this.switchedAt = switchedAt;
         }
     }
     private static final class Config {
@@ -36,7 +39,8 @@ public final class ModProfiles {
         String selected = "";
     }
     private static final class Switch {
-        String phase, previous, target;
+        String phase, previous, target, previousName, targetName;
+        long switchedAt;
         Map<String, String> before, after;
         Set<String> core;
     }
@@ -141,12 +145,19 @@ public final class ModProfiles {
         s.previous = p.getProperty("previous", ""); s.target = p.getProperty("target", "");
         if (!s.previous.isEmpty()) id(s.previous);
         if (!s.target.isEmpty()) id(s.target);
+        s.previousName = displayName(p.getProperty("previousName"));
+        s.targetName = displayName(p.getProperty("targetName"));
+        try { s.switchedAt = Math.max(0, Long.parseLong(p.getProperty("switchedAt", "0"))); }
+        catch (NumberFormatException ignored) { s.switchedAt = 0; }
         s.before = hashes(p, "before"); s.after = hashes(p, "after"); s.core = paths(p, "core");
         return s;
     }
     private void save(Switch s, String phase) throws IOException {
         Properties p = new Properties(); p.setProperty("phase", phase);
         p.setProperty("previous", s.previous); p.setProperty("target", s.target); putPaths(p, "core", s.core);
+        if (s.previousName != null) p.setProperty("previousName", s.previousName);
+        if (s.targetName != null) p.setProperty("targetName", s.targetName);
+        p.setProperty("switchedAt", Long.toString(s.switchedAt));
         putPaths(p, "before", s.before.keySet()); putPaths(p, "after", s.after.keySet());
         s.before.forEach((path, hash) -> p.setProperty("before.hash." + path, hash));
         s.after.forEach((path, hash) -> p.setProperty("after.hash." + path, hash));
@@ -155,6 +166,16 @@ public final class ModProfiles {
     private static boolean pending(Switch s) { return s != null && (s.phase.equals("pending") || s.phase.equals("undo_pending")); }
     private void editable() throws IOException { if (pending(last())) throw new NeedsRecovery(); }
     public void requireIdle() throws IOException { editable(); }
+
+    // Optional display metadata must never prevent recovery of an older switch journal.
+    private static String displayName(String name) {
+        return name == null || (name.length() <= 80 && name.chars().noneMatch(Character::isISOControl)) ? name : "";
+    }
+    private static String switchName(String saved, Config c, String identifier) {
+        if (saved != null) return saved;
+        Profile profile = c.profiles.get(identifier);
+        return profile == null ? "" : profile.name;
+    }
 
     public State state() throws Exception {
         Config c = config(); Switch s = last(); ModVault.Snapshot snapshot = vault.list();
@@ -170,7 +191,9 @@ public final class ModProfiles {
         List<Profile> profiles = new ArrayList<>(c.profiles.values());
         profiles.sort(Comparator.comparing((Profile p) -> !p.id.equals(current)).thenComparing(p -> p.name.toLowerCase(Locale.ROOT)));
         return new State(profiles, c.core, activeId,
-                s != null && !s.phase.equals("undone") && s.core.equals(c.core), pending(s), snapshot.warnings);
+                s != null && !s.phase.equals("undone") && s.core.equals(c.core), pending(s), snapshot.warnings,
+                s == null ? "" : switchName(s.previousName, c, s.previous),
+                s == null ? "" : switchName(s.targetName, c, s.target), s == null ? 0 : s.switchedAt);
     }
 
     public Profile profile(String identifier) throws Exception {
@@ -258,6 +281,11 @@ public final class ModProfiles {
         ModVault.Snapshot snapshot = vault.list();
         Switch s = new Switch(); s.previous = c.selected; s.target = identifier; s.core = new LinkedHashSet<>(c.core);
         s.before = active(snapshot);
+        Profile previous = c.profiles.get(c.selected);
+        Set<String> previousPaths = new HashSet<>(c.core);
+        if (previous != null) previousPaths.addAll(previous.paths);
+        s.previousName = previous != null && previousPaths.equals(s.before.keySet()) ? previous.name : "";
+        s.targetName = profile.name; s.switchedAt = System.currentTimeMillis();
         Set<String> selected = new LinkedHashSet<>(profile.paths); selected.addAll(c.core);
         s.after = desired(selected, snapshot, s.before);
         save(s, "pending"); // Written before the first file operation, including for an empty group.

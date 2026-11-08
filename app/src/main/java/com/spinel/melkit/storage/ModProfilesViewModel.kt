@@ -17,6 +17,7 @@ data class ProfileEditor(val id: String, val name: String, val selected: Set<Str
 data class ProfileRequest(val action: String, val id: String = "", val name: String = "")
 data class ModProfilesState(val items: List<ProfileCard> = emptyList(), val coreCount: Int = 0,
     val loaded: Boolean = false, val busy: Boolean = false, val undo: Boolean = false, val recovery: Boolean = false, val warnings: Int = 0,
+    val previousName: String = "", val targetName: String = "", val switchedAt: Long = 0,
     val issue: String? = null, val result: String? = null, val editor: ProfileEditor? = null, val request: ProfileRequest? = null)
 
 class ModProfilesViewModel : ViewModel() {
@@ -36,6 +37,7 @@ class ModProfilesViewModel : ViewModel() {
             ProfileCard(item.getString("id"), item.getString("name"), item.getInt("count"), item.getBoolean("active"))
         }
         mutableState.update { it.copy(items = items, coreCount = response.getInt("core"),
+            previousName = response.optString("previousName"), targetName = response.optString("targetName"), switchedAt = response.optLong("switchedAt"),
             undo = response.getBoolean("undo"), recovery = response.getBoolean("recovery"), warnings = response.getInt("warnings"), loaded = true) }
     }
     private fun run(block: suspend () -> Unit) {

@@ -58,15 +58,26 @@ public class ModProfilesCheck {
             ok(f.active().equals(set(CAR, CORE)), "Only selected and core mods are active");
             ok(f.profiles.state().activeId.equals(cars), "Exactly one current group is marked active");
             ok(f.profiles.state().profiles.get(0).id.equals(cars), "Current group is listed first");
+            ok(f.profiles.state().previousName.isEmpty() && f.profiles.state().targetName.equals("السيارات"),
+                    "First activation describes an unnamed prior state without inventing a source group");
             f.profiles.apply(war);
             ok(f.active().equals(set(WAR, CORE)), "Switching groups replaces membership and preserves core");
+            ModProfiles.State switchState = f.profiles.state();
+            ok(switchState.previousName.equals("السيارات") && switchState.targetName.equals("الحروب") && switchState.switchedAt > 0,
+                    "Switch summary captures both names and an actual timestamp");
             f.bytes(WAR); f.bytes(CORE);
             ModProfiles restarted = new ModProfiles(new ModVault(f.root.toFile(), f.vaultPath.toFile()), f.profilesPath.toFile());
             ok(restarted.state().activeId.equals(war) && restarted.state().core.equals(set(CORE)), "Groups, core and selected state survive restart");
+            ok(restarted.state().previousName.equals(switchState.previousName) && restarted.state().targetName.equals(switchState.targetName)
+                    && restarted.state().switchedAt == switchState.switchedAt, "Switch summary survives restart without replacing its timestamp");
+            f.profiles.saveProfile(cars, "Renamed cars", set(CAR)); f.profiles.saveProfile(war, "Renamed war", set(WAR));
+            ok(restarted.state().previousName.equals("السيارات") && restarted.state().targetName.equals("الحروب"),
+                    "Later name edits do not rewrite the historical switch summary");
             restarted.undo();
             ok(f.active().equals(set(CAR, CORE)), "Undo restores exact prior membership");
             f.bytes(CAR); f.bytes(CORE);
             ok(restarted.state().activeId.equals(cars) && !restarted.state().undo, "Undo restores previous group and is one-level");
+            ok(restarted.state().switchedAt == switchState.switchedAt, "Undo preserves the time of the original switch");
             rejects(ModVault.Changed.class, restarted::undo, "Repeated undo cannot replay an old switch");
             f.profiles.saveProfile(cars, "سيارات جديدة", set(CAR));
             ok(f.active().equals(set(CAR, CORE)), "Editing a group is metadata only");
@@ -81,6 +92,24 @@ public class ModProfilesCheck {
             rejects(SecurityException.class, () -> f.group("bad", "Mods/../Maps/a.melmod"), "Stored membership cannot escape mod paths");
             Path linked = f.temporary.resolve("linked"); Files.createSymbolicLink(linked, f.profilesPath);
             rejects(SecurityException.class, () -> new ModProfiles(f.vault, linked.toFile()), "Profile storage symlink is rejected");
+        }
+        try (Fixture f = new Fixture()) {
+            String cars = f.group("Cars", CAR), war = f.group("War", WAR);
+            f.profiles.apply(cars); f.profiles.apply(war);
+            File journal = f.profilesPath.resolve("switch.properties").toFile();
+            Properties legacy = new Properties();
+            try (InputStream input = new FileInputStream(journal)) { legacy.load(input); }
+            legacy.remove("previousName"); legacy.remove("targetName"); legacy.remove("switchedAt");
+            try (OutputStream output = new FileOutputStream(journal)) { legacy.store(output, "Old MelKit journal"); }
+            ModProfiles.State state = f.profiles.state();
+            ok(state.previousName.equals("Cars") && state.targetName.equals("War") && state.switchedAt == 0,
+                    "Legacy journals use available group names and do not invent historical time");
+            legacy.setProperty("switchedAt", "invalid timestamp"); legacy.setProperty("targetName", "bad\nname");
+            try (OutputStream output = new FileOutputStream(journal)) { legacy.store(output, "Damaged optional display fields"); }
+            ok(f.profiles.state().switchedAt == 0 && f.profiles.state().targetName.isEmpty(),
+                    "Invalid optional display fields do not block reading recovery state");
+            f.profiles.undo();
+            ok(f.active().equals(set(CAR, CORE)), "Undo remains available for a legacy journal with invalid optional metadata");
         }
         try (Fixture f = new Fixture()) {
             String cars = f.group("Cars", CAR);
@@ -107,6 +136,8 @@ public class ModProfilesCheck {
             });
             rejects(ProcessStopped.class, () -> stopped.apply(cars), "Process death is simulated after one completed move");
             ok(f.profiles.state().recovery && f.profiles.state().undo, "A fresh manager exposes recoverable pending switch");
+            ok(f.profiles.state().targetName.equals("Cars") && f.profiles.state().switchedAt > 0,
+                    "Interrupted switches retain their summary for recovery");
             rejects(ModProfiles.NeedsRecovery.class, () -> f.profiles.apply(cars), "New switch is blocked during recovery");
             rejects(ModProfiles.NeedsRecovery.class, f.profiles::requireIdle, "Individual toggle is blocked during recovery");
             rejects(ModProfiles.NeedsRecovery.class, () -> f.group("Other", WAR), "Metadata changes are blocked during recovery");

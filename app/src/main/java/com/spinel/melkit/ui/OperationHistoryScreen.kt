@@ -154,12 +154,20 @@ internal fun OperationHistoryScreen(library: GameLibraryViewModel, connection: G
                     RecoverySection.GROUPS -> {
                         if (groupState.undo || groupState.recovery) item {
                             val title = if (groupState.recovery) R.string.profile_recover else R.string.profile_undo
-                            FilledTonalButton(enabled = ready, onClick = {
-                                prompt = RecoveryPrompt(title, R.string.profile_undo_confirm) {
-                                    profiles.request(ProfileRequest("undo"))
-                                    profiles.confirm(library)
-                                }
-                            }) { Text(stringResource(title)) }
+                            val previous = groupState.previousName.ifEmpty { stringResource(R.string.history_previous_mod_state) }
+                            val target = groupState.targetName.ifEmpty { stringResource(R.string.history_selected_group) }
+                            val summary = stringResource(R.string.history_group_switch_summary, previous, target)
+                            HistoryCard(stringResource(R.string.history_last_group_switch), "") {
+                                Text(summary)
+                                if (groupState.switchedAt > 0) Text(dates.format(Date(groupState.switchedAt)),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                FilledTonalButton(enabled = ready, onClick = {
+                                    prompt = RecoveryPrompt(title, R.string.profile_undo_confirm, summary) {
+                                        profiles.request(ProfileRequest("undo"))
+                                        profiles.confirm(library)
+                                    }
+                                }) { Text(stringResource(title)) }
+                            }
                         } else if (groupState.loaded && !busy) item { Text(stringResource(R.string.history_no_group_undo)) }
                     }
                     RecoverySection.MODS -> {

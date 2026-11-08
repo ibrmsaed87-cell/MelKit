@@ -146,6 +146,7 @@ class GameLibraryService : IGameLibrary.Stub() {
                     }
                     JSONObject().put("items", items).put("core", state.core.size)
                         .put("undo", state.undo).put("recovery", state.recovery).put("warnings", state.warnings)
+                        .put("previousName", state.previousName).put("targetName", state.targetName).put("switchedAt", state.switchedAt)
                 }
                 "editor" -> {
                     val profile = manager.profile(request.optString("id"))

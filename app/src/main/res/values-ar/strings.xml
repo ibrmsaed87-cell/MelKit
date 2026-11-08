@@ -328,6 +328,10 @@
     <string name="share_split_apk">هذا التثبيت يتكون من عدة ملفات APK. يمكنك مشاركة رابط المشروع.</string>
     <string name="share_failed">توقفت العملية. راجع الملفات المستلمة قبل البدء برمز QR جديد.</string>
     <string name="share_finishing">جارٍ إنهاء الاتصال المباشر</string>
+    <string name="history_last_group_switch">آخر تبديل للمجموعات</string>
+    <string name="history_group_switch_summary">من %1$s إلى %2$s</string>
+    <string name="history_previous_mod_state">حالة المودات السابقة</string>
+    <string name="history_selected_group">المجموعة المحددة</string>
 </resources>
 
 
