@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,6 +59,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     var pending by rememberSaveable { mutableStateOf("") }
     var editingCover by rememberSaveable { mutableStateOf(false) }
     var restore by remember { mutableStateOf<ReceivedFile?>(null) }
+    var confirmBatch by remember { mutableStateOf(false) }
     var save by remember { mutableStateOf<ReceivedFile?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.saved_location, pageState.savedPath.orEmpty())
@@ -165,11 +167,36 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
         page = returnPage
     }
 
-    val screen = if (transfer.active) "transfer" else page
+    val screen = when {
+        transfer.active -> "transfer"
+        pageState.batchRestore?.finished == false -> "contents"
+        else -> page
+    }
+    val bundleFiles = if (screen == "contents") pageState.received.filter {
+        it.batch == pageState.bundleBatch && ShareWire.validPath(it.path)
+    } else emptyList()
+    val selectedCount = bundleFiles.count { it.path in pageState.restoreSelection }
+    val batch = pageState.batchRestore
+    val outcomes = batch?.entries?.associateBy { it.path }.orEmpty()
+    val restoreToolbar = screen == "contents" && bundleFiles.isNotEmpty()
+    val listState = remember(screen) { LazyListState() }
+    val batchMessage = batch?.let {
+        stringResource(R.string.bulk_finished_message, it.restored, it.skipped, it.failed, it.notAttempted)
+    }
+    LaunchedEffect(batch?.finished) {
+        if (batch?.finished == true && screen == "contents") {
+            listState.scrollToItem(0)
+            batchMessage?.let { snackbar.showSnackbar(it, withDismissAction = true, duration = SnackbarDuration.Long) }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         key(screen) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp,
-                top = 16.dp, bottom = if (screen == "pick") 100.dp else 20.dp),
+            LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(start = 20.dp, end = 20.dp,
+                top = 16.dp, bottom = when {
+                    restoreToolbar && batch != null && !batch.finished -> 160.dp
+                    screen == "pick" || restoreToolbar -> 100.dp
+                    else -> 20.dp
+                }),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text(stringResource(when (screen) {
@@ -182,7 +209,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         else -> R.string.sharing
                     }), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 }
-                if (pageState.busy || (screen == "pick" && source == "game" && connection.busy)) {
+                if ((pageState.busy && batch == null) || (screen == "pick" && source == "game" && connection.busy)) {
                     item { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
                 }
                 pageState.issue?.let { error -> item { ShareError(error, bundles || screen == "contents") } }
@@ -434,6 +461,23 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                             }
                             if (pageState.bundleStatus == "verified") ShareNotice(stringResource(R.string.bundle_verified))
                         }
+                        if (screen == "contents" && bundleFiles.isNotEmpty()) item {
+                            ShareCard(null, null) {
+                                Text(stringResource(R.string.bulk_selected_count, selectedCount), fontWeight = FontWeight.Bold)
+                                OutlinedButton(enabled = !pageState.busy, onClick = model::selectAllForRestore) {
+                                    Text(stringResource(if (selectedCount == bundleFiles.size) R.string.bulk_deselect_all
+                                        else R.string.bulk_select_all))
+                                }
+                                Text(stringResource(R.string.bulk_existing_help), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (screen == "contents" && batch != null) item {
+                            RestoreBatchSummary(batch)
+                            if (batch.finished && batch.restored > 0) OutlinedButton(onClick = { model.openGame(context) }) {
+                                Text(stringResource(R.string.share_open_game))
+                            }
+                        }
                         if (pageState.saved || pageState.imported) item {
                             if (pageState.imported) {
                                 ShareNotice(stringResource(R.string.share_imported))
@@ -460,7 +504,12 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         items(received, key = { it.batch + "/" + it.path }) { file ->
                             ShareCard(null, null) {
                                 val archive = ShareWire.validBundlePath(file.path)
-                                SharePath(if (archive) file.file.name else file.path)
+                                if (screen == "contents" && !archive) {
+                                    PickShareRow(file.path, file.path in pageState.restoreSelection, !pageState.busy) {
+                                        model.selectForRestore(file.path)
+                                    }
+                                    outcomes[file.path]?.let { outcome -> RestoreFileResult(outcome) }
+                                } else SharePath(if (archive) file.file.name else file.path)
                                 Text(Formatter.formatFileSize(context, file.bytes))
                                 if (archive) {
                                     FilledTonalButton(enabled = !pageState.busy, onClick = {
@@ -498,10 +547,47 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                     }) { Text(stringResource(if (bundles) R.string.bundle_create else R.string.share_create_qr)) }
             }
         }
+        if (restoreToolbar) {
+            Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), color = MelkitSurface, shadowElevation = 4.dp) {
+                if (batch != null && !batch.finished) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.bulk_progress, batch.completed, batch.total))
+                        LinearProgressIndicator(progress = { batch.completed.toFloat() / batch.total }, modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !batch.stopRequested,
+                            onClick = model::stopRestore) {
+                            Text(stringResource(if (batch.stopRequested) R.string.bulk_stop_requested else R.string.bulk_stop))
+                        }
+                    }
+                } else {
+                    FilledTonalButton(modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        enabled = selectedCount > 0 && !pageState.busy && connection.connected && !connection.busy,
+                        onClick = { confirmBatch = true }) {
+                        Text(stringResource(R.string.bulk_restore_action, selectedCount))
+                    }
+                }
+            }
+        }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
     }
     if (bundles && editingCover) {
         CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
+    }
+    if (confirmBatch) {
+        AlertDialog(onDismissRequest = { confirmBatch = false },
+            title = { Text(stringResource(R.string.bulk_restore_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.bulk_restore_confirm, selectedCount))
+                    Text(stringResource(R.string.share_close_game))
+                }
+            }, confirmButton = {
+                TextButton(enabled = selectedCount > 0 && connection.connected && !connection.busy && !pageState.busy,
+                    onClick = { confirmBatch = false; model.restoreSelected(library) }) {
+                    Text(stringResource(R.string.vault_closed_continue))
+                }
+            }, dismissButton = {
+                TextButton(onClick = { confirmBatch = false }) { Text(stringResource(R.string.saved_cancel)) }
+            })
     }
     restore?.let { file ->
         AlertDialog(onDismissRequest = { restore = null }, title = { Text(stringResource(R.string.share_import)) },
@@ -515,6 +601,52 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 }) { Text(stringResource(R.string.vault_closed_continue)) }
             }, dismissButton = { TextButton(onClick = { restore = null }) { Text(stringResource(R.string.saved_cancel)) } })
     }
+}
+
+@Composable
+private fun RestoreBatchSummary(batch: BatchRestore.Snapshot) {
+    ShareCard(if (batch.finished) R.string.bulk_result_title else R.string.bulk_progress_title, null) {
+        Text(stringResource(R.string.bulk_progress, batch.completed, batch.total))
+        LinearProgressIndicator(progress = { batch.completed.toFloat() / batch.total }, modifier = Modifier.fillMaxWidth())
+        if (batch.current.isNotEmpty()) SharePath(batch.current)
+        if (batch.stopRequested && !batch.finished) Text(stringResource(R.string.bulk_stop_help))
+        Text(stringResource(R.string.bulk_counts, batch.restored, batch.skipped, batch.failed))
+        if (batch.finished && batch.notAttempted > 0) {
+            Text(stringResource(R.string.bulk_not_attempted_count, batch.notAttempted))
+        }
+        if (batch.finished && (batch.failed > 0 || batch.notAttempted > 0)) {
+            Text(stringResource(R.string.bulk_retry_hint), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (batch.finished && batch.stopReason.isNotEmpty() && batch.stopReason != "cancelled") {
+            Text(stringResource(restoreResultText(batch.stopReason)), color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+@Composable
+private fun RestoreFileResult(entry: BatchRestore.Entry) {
+    val color = when (entry.outcome) {
+        BatchRestore.Outcome.RESTORED -> MelkitMint
+        BatchRestore.Outcome.FAILED -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Text(stringResource(restoreResultText(entry.status)), color = color, style = MaterialTheme.typography.bodySmall)
+}
+
+private fun restoreResultText(status: String): Int = when (status) {
+    "ok" -> R.string.bulk_restored
+    "exists" -> R.string.bulk_skipped
+    "running" -> R.string.bulk_running
+    "waiting" -> R.string.bulk_waiting
+    "not_attempted", "cancelled" -> R.string.bulk_not_attempted
+    "connect" -> R.string.share_restore_help
+    "recovery" -> R.string.profile_recovery_body
+    "busy" -> R.string.bulk_busy
+    "partial" -> R.string.bulk_partial
+    "changed" -> R.string.bulk_changed
+    "unconfirmed" -> R.string.bulk_unconfirmed
+    else -> R.string.bulk_failed
 }
 
 @Composable

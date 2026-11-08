@@ -340,6 +340,33 @@
     <string name="saved_location">تم الحفظ في:\n%1$s</string>
     <string name="open_saved_folder">فتح المجلد</string>
     <string name="saved_copy_ready">تم حفظ النسخة</string>
+    <string name="bulk_selected_count">الملفات المحددة للاستعادة: %1$d</string>
+    <string name="bulk_select_all">تحديد الكل</string>
+    <string name="bulk_deselect_all">إلغاء تحديد الكل</string>
+    <string name="bulk_existing_help">تُتجاوز الملفات الموجودة داخل اللعبة مع الحفاظ عليها.</string>
+    <string name="bulk_restore_action">استعادة المحدد (%1$d)</string>
+    <string name="bulk_restore_title">استعادة الملفات المحددة</string>
+    <string name="bulk_restore_confirm">ستُستعاد %1$d ملفًا محددًا، وتُتجاوز الملفات الموجودة. عند إيقاف الدفعة تبقى الملفات التي اكتملت استعادتها.</string>
+    <string name="bulk_progress_title">جارٍ استعادة الملفات المحددة</string>
+    <string name="bulk_result_title">نتائج الاستعادة</string>
+    <string name="bulk_progress">تمت معالجة %1$d من %2$d ملف</string>
+    <string name="bulk_stop">إيقاف بعد الملف الجاري</string>
+    <string name="bulk_stop_requested">جارٍ إنهاء الملف الجاري</string>
+    <string name="bulk_stop_help">ستكتمل استعادة الملف الجاري أولًا، ثم تتوقف الدفعة.</string>
+    <string name="bulk_counts">استُعيدت: %1$d\nتم تجاوزها: %2$d\nتعذر إكمالها: %3$d</string>
+    <string name="bulk_not_attempted_count">لم تُجرَ محاولتها: %1$d</string>
+    <string name="bulk_restored">تمت الاستعادة إلى اللعبة</string>
+    <string name="bulk_skipped">موجود داخل اللعبة؛ تم تجاوزه والحفاظ عليه</string>
+    <string name="bulk_running">جارٍ استعادة هذا الملف</string>
+    <string name="bulk_waiting">بانتظار الاستعادة</string>
+    <string name="bulk_not_attempted">لم تُجرَ المحاولة</string>
+    <string name="bulk_busy">توجد عملية أخرى جارية. أعد محاولة الملفات المتبقية بعد انتهائها.</string>
+    <string name="bulk_partial">لم تكتمل العملية. تحقق من الملف داخل اللعبة قبل إعادة المحاولة.</string>
+    <string name="bulk_changed">تغيرت النسخة المصدر أو تعذر التحقق منها.</string>
+    <string name="bulk_unconfirmed">تعذر تأكيد النتيجة. تحقق من وجود الملف داخل اللعبة.</string>
+    <string name="bulk_failed">تعذرت استعادة هذا الملف</string>
+    <string name="bulk_finished_message">استُعيدت %1$d · تم تجاوز %2$d · تعذر إكمال %3$d · لم تبدأ استعادة %4$d</string>
+    <string name="bulk_retry_hint">تبقى الملفات المتعذرة والتي لم تبدأ استعادتها محددة لإعادة المحاولة.</string>
 </resources>
 
 

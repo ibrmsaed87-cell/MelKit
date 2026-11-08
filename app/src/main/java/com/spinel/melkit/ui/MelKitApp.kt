@@ -152,6 +152,7 @@ fun MelKitApp(shareRequest: Int = 0) {
     val selectedRoot = if (root) route else parent
     LaunchedEffect(route) {
         if (route != "bundles") bundleModel.closeBundleSession()
+        if (route != "share") shareModel.stopRestore()
     }
     val navigate: (String) -> Unit = { target ->
         if (destinations.any { it.route == route }) parent = route

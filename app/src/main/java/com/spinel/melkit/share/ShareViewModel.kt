@@ -24,6 +24,8 @@ import com.spinel.melkit.storage.PreviewImages
 import com.spinel.melkit.storage.SavedCopy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -44,6 +46,7 @@ internal data class SharePage(val queue: List<ShareInput> = emptyList(), val rec
     val busy: Boolean = false, val issue: String? = null, val imported: Boolean = false, val saved: Boolean = false,
     val savedPath: String? = null, val bundleStatus: String? = null, val bundleName: String? = null,
     val bundleUri: Uri? = null, val bundleBatch: String? = null,
+    val restoreSelection: Set<String> = emptySet(), val batchRestore: BatchRestore.Snapshot? = null,
     val draftCover: Bitmap? = null, val receivedCover: Bitmap? = null)
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,6 +56,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     val state = mutableState.asStateFlow()
     val transfer = MelKitShareService.state
     private var resetWhenIdle = false
+    private var activeRestore: BatchRestore? = null
 
     private fun run(clearMessages: Boolean = true, task: suspend () -> Unit) {
         if (mutableState.value.busy) return
@@ -71,7 +75,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun clearFeedback() { mutableState.update { it.copy(issue = null, saved = false, imported = false,
-        savedPath = null, bundleStatus = null) } }
+        savedPath = null, bundleStatus = null, batchRestore = if (it.busy) it.batchRestore else null) } }
 
     fun issue(code: String?) {
         clearFeedback()
@@ -79,7 +83,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun closeBundleSession() {
-        if (mutableState.value.busy) { resetWhenIdle = true; return }
+        if (mutableState.value.busy) { activeRestore?.requestStop(); resetWhenIdle = true; return }
         resetWhenIdle = false
         // Session state only. Published Downloads and verified received files remain on disk.
         mutableState.value = SharePage()
@@ -183,7 +187,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun importBundle(uri: Uri) = run {
-        mutableState.update { it.copy(bundleBatch = null, receivedCover = null) }
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet()) }
         val (batch, cover) = runInterruptible(Dispatchers.IO) {
             withBundleArchive { archive ->
                 open(uri).use { source ->
@@ -196,7 +200,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun openReceivedBundle(item: ReceivedFile) = run {
-        mutableState.update { it.copy(bundleBatch = null, receivedCover = null) }
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet()) }
         val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}".toByteArray()).toString()
         val (batch, cover) = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
         mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
@@ -286,6 +290,72 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         }
         if (status == "ok") mutableState.update { it.copy(imported = true) }
         else issue("RESTORE_" + status.uppercase(Locale.ROOT))
+    }
+
+    private fun bundleFiles(page: SharePage): List<ReceivedFile> = if (page.bundleBatch == null) emptyList() else
+        page.received.filter { it.batch == page.bundleBatch && ShareWire.validPath(it.path) }
+
+    fun selectForRestore(path: String) {
+        val page = mutableState.value
+        if (page.busy || bundleFiles(page).none { it.path == path }) return
+        clearFeedback()
+        mutableState.update { it.copy(restoreSelection = if (path in it.restoreSelection)
+            it.restoreSelection - path else it.restoreSelection + path) }
+    }
+
+    fun selectAllForRestore() {
+        val page = mutableState.value
+        if (page.busy) return
+        val paths = bundleFiles(page).map { it.path }.toSet()
+        clearFeedback()
+        mutableState.update { it.copy(restoreSelection = if (paths.isNotEmpty() && paths == it.restoreSelection)
+            emptySet() else paths) }
+    }
+
+    fun stopRestore() {
+        activeRestore?.let { batch ->
+            batch.requestStop()
+            mutableState.update { it.copy(batchRestore = batch.snapshot()) }
+        }
+    }
+
+    fun restoreSelected(library: GameLibraryViewModel) {
+        val page = mutableState.value
+        if (page.busy) return
+        val files = bundleFiles(page).filter { it.path in page.restoreSelection }
+        if (files.isEmpty() || files.size != page.restoreSelection.size) { issue("INVALID_FILE"); return }
+        val batch = try { BatchRestore(files.map { it.path }) } catch (_: IllegalArgumentException) {
+            issue("INVALID_FILE"); return
+        }
+        val byPath = files.associateBy { it.path }
+        activeRestore = batch
+        run {
+            mutableState.update { it.copy(batchRestore = batch.snapshot()) }
+            try {
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val path = batch.next() ?: break
+                    mutableState.update { it.copy(batchRestore = batch.snapshot()) }
+                    val item = byPath.getValue(path)
+                    val status = library.restoreSaved(item.path, item.bytes) {
+                        ParcelFileDescriptor.open(item.file, ParcelFileDescriptor.MODE_READ_ONLY)
+                    }
+                    batch.complete(status)
+                    mutableState.update { it.copy(batchRestore = batch.snapshot()) }
+                }
+            } finally {
+                // Cancellation can arrive after the remote write finishes but before its
+                // reply is delivered. Preserve that uncertainty rather than claim failure
+                // or success, and leave all files that were not started untouched.
+                if (batch.snapshot().current.isNotEmpty()) batch.complete("unconfirmed")
+                batch.requestStop()
+                val result = batch.snapshot()
+                val retry = result.entries.filter { it.outcome == BatchRestore.Outcome.FAILED ||
+                    it.outcome == BatchRestore.Outcome.NOT_ATTEMPTED }.map { it.path }.toSet()
+                mutableState.update { it.copy(batchRestore = result, restoreSelection = retry) }
+                activeRestore = null
+            }
+        }
     }
 
     fun save(item: ReceivedFile) = run {

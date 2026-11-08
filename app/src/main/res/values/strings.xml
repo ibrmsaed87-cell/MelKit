@@ -347,6 +347,33 @@
     <string name="saved_location">Saved to:\n%1$s</string>
     <string name="open_saved_folder">Open folder</string>
     <string name="saved_copy_ready">Copy saved</string>
+    <string name="bulk_selected_count">Selected for restore: %1$d</string>
+    <string name="bulk_select_all">Select all</string>
+    <string name="bulk_deselect_all">Deselect all</string>
+    <string name="bulk_existing_help">Existing game files are skipped and preserved.</string>
+    <string name="bulk_restore_action">Restore selected (%1$d)</string>
+    <string name="bulk_restore_title">Restore selected files</string>
+    <string name="bulk_restore_confirm">Restore %1$d selected files. Existing files will be skipped. Completed restores are kept if the batch stops.</string>
+    <string name="bulk_progress_title">Restoring selected files</string>
+    <string name="bulk_result_title">Restore results</string>
+    <string name="bulk_progress">Processed %1$d of %2$d files</string>
+    <string name="bulk_stop">Stop after current file</string>
+    <string name="bulk_stop_requested">Finishing current file</string>
+    <string name="bulk_stop_help">The current file will finish before the batch stops.</string>
+    <string name="bulk_counts">Restored: %1$d\nSkipped existing: %2$d\nCould not complete: %3$d</string>
+    <string name="bulk_not_attempted_count">Not attempted: %1$d</string>
+    <string name="bulk_restored">Restored to the game</string>
+    <string name="bulk_skipped">Already in the game; skipped and preserved</string>
+    <string name="bulk_running">Restoring this file</string>
+    <string name="bulk_waiting">Waiting to restore</string>
+    <string name="bulk_not_attempted">Not attempted</string>
+    <string name="bulk_busy">Another operation is running. Try the remaining files after it finishes.</string>
+    <string name="bulk_partial">The operation did not finish. Check the file in the game before retrying.</string>
+    <string name="bulk_changed">The source copy changed or could not be verified.</string>
+    <string name="bulk_unconfirmed">The result could not be confirmed. Check whether the file is in the game.</string>
+    <string name="bulk_failed">Could not restore this file</string>
+    <string name="bulk_finished_message">Restored %1$d · Skipped %2$d · Could not complete %3$d · Not attempted %4$d</string>
+    <string name="bulk_retry_hint">Files that could not be completed or were not attempted remain selected for retry.</string>
 </resources>
 
 
