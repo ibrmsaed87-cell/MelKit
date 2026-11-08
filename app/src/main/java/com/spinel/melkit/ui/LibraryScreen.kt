@@ -314,7 +314,7 @@ private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, 
     }
 }
 
-private fun issueText(issue: LibraryIssue): Int = when (issue) {
+internal fun issueText(issue: LibraryIssue): Int = when (issue) {
     LibraryIssue.START_SHIZUKU -> R.string.library_start_shizuku
     LibraryIssue.UPDATE_SHIZUKU -> R.string.library_update_shizuku
     LibraryIssue.PERMISSION_DENIED -> R.string.library_permission_denied
@@ -328,7 +328,7 @@ private fun issueText(issue: LibraryIssue): Int = when (issue) {
     LibraryIssue.STORAGE_PERMISSION -> R.string.library_storage_permission
 }
 
-private fun openShizuku(context: Context) {
+internal fun openShizuku(context: Context) {
     val intent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
     if (intent == null || runCatching { context.startActivity(intent) }.isFailure) {
         Toast.makeText(context, R.string.library_shizuku_not_installed, Toast.LENGTH_LONG).show()

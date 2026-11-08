@@ -51,7 +51,7 @@
     <string name="bundle_send_direct">Send bundle via MelKit</string>
     <string name="bundle_open_received">Open received bundle</string>
     <string name="bundle_import">Open a MelKit bundle</string>
-    <string name="bundle_verified">The bundle was verified. Open its contents to choose files to restore.</string>
+    <string name="bundle_verified">The bundle contents were verified.</string>
     <string name="bundle_contents">Bundle contents</string>
     <string name="bundle_invalid">Choose a valid bundle created by MelKit.</string>
     <string name="bundle_checksum">File verification failed. Try another copy of the bundle.</string>
@@ -317,8 +317,8 @@
     <string name="share_other_apps">Share via apps</string>
     <string name="share_app_apk">Share MelKit APK</string>
     <string name="share_app_apk_body">Send the installed APK using a sharing app on your phone.</string>
-    <string name="share_project_link">Share project link</string>
-    <string name="share_project_body">Share the public MelKit project page.</string>
+    <string name="share_project_link">Share app link</string>
+    <string name="share_project_body">Share the MelKit Google Play listing.</string>
     <string name="share_permission">Grant the requested permission to continue.</string>
     <string name="share_wifi_off">Turn on Wi-Fi, then start sharing again.</string>
     <string name="share_location">Turn on Location services to pair on this Android version.</string>
@@ -339,6 +339,14 @@
     <string name="history_group_switch_summary">From %1$s to %2$s</string>
     <string name="history_previous_mod_state">previous mod state</string>
     <string name="history_selected_group">selected group</string>
+    <string name="bundle_new">Create a bundle</string>
+    <string name="bundle_new_help">Choose files, add an optional cover, and save one ZIP for sharing.</string>
+    <string name="bundle_open_help">Open a saved or received MelKit bundle to review and restore its files.</string>
+    <string name="bundle_ready">Bundle ready to share</string>
+    <string name="bundle_home">Back to bundles</string>
+    <string name="saved_location">Saved to:\n%1$s</string>
+    <string name="open_saved_folder">Open folder</string>
+    <string name="saved_copy_ready">Copy saved</string>
 </resources>
 
 

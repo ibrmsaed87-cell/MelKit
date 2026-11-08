@@ -29,13 +29,16 @@ internal class DownloadCopy private constructor(
 
     fun publish(): String {
         if (uri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // MediaStore may suffix the name when a previous copy already exists.
-            val name = resolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use {
-                if (it.moveToFirst()) it.getString(0) else null
-            } ?: throw IOException("Cannot read saved filename")
             val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
             if (resolver.update(uri, values, null, null) != 1) throw IOException("Cannot publish verified copy")
-            return relativeDirectory + name
+            // Publishing can rename a pending file to avoid an existing Downloads entry.
+            // Read its final metadata after that move, including any numbered suffix.
+            return resolver.query(uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH,
+                MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (!it.moveToFirst() || it.isNull(1)) throw IOException("Cannot read saved filename")
+                val directory = if (it.isNull(0)) relativeDirectory else it.getString(0)
+                directory.trimEnd('/') + "/" + it.getString(1)
+            } ?: throw IOException("Cannot read saved filename")
         }
         return relativeDirectory + requireNotNull(file).name
     }
@@ -67,3 +70,4 @@ internal class DownloadCopy private constructor(
         }
     }
 }
+

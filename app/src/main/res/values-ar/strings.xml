@@ -47,7 +47,7 @@
     <string name="bundle_send_direct">إرسال الحزمة عبر MelKit</string>
     <string name="bundle_open_received">فتح الحزمة المستلمة</string>
     <string name="bundle_import">فتح حزمة MelKit</string>
-    <string name="bundle_verified">تم التحقق من الحزمة. افتح محتوياتها لاختيار الملفات التي تريد استعادتها.</string>
+    <string name="bundle_verified">تم التحقق من محتويات الحزمة.</string>
     <string name="bundle_contents">محتويات الحزمة</string>
     <string name="bundle_invalid">اختر حزمة صالحة أنشأها MelKit.</string>
     <string name="bundle_checksum">تعذّر التحقق من الملفات. جرّب نسخة أخرى من الحزمة.</string>
@@ -310,8 +310,8 @@
     <string name="share_other_apps">المشاركة عبر التطبيقات</string>
     <string name="share_app_apk">مشاركة ملف APK لتطبيق MelKit</string>
     <string name="share_app_apk_body">أرسل ملف التثبيت الموجود على هاتفك عبر تطبيقات المشاركة.</string>
-    <string name="share_project_link">مشاركة رابط المشروع</string>
-    <string name="share_project_body">شارك صفحة مشروع MelKit العامة.</string>
+    <string name="share_project_link">مشاركة رابط التطبيق</string>
+    <string name="share_project_body">شارك رابط MelKit على متجر Google Play.</string>
     <string name="share_permission">امنح الإذن المطلوب للمتابعة.</string>
     <string name="share_wifi_off">شغّل الواي فاي ثم أعد بدء المشاركة.</string>
     <string name="share_location">شغّل خدمات الموقع لإتمام الاقتران على هذا الإصدار من أندرويد.</string>
@@ -332,6 +332,14 @@
     <string name="history_group_switch_summary">من %1$s إلى %2$s</string>
     <string name="history_previous_mod_state">حالة المودات السابقة</string>
     <string name="history_selected_group">المجموعة المحددة</string>
+    <string name="bundle_new">إنشاء حزمة</string>
+    <string name="bundle_new_help">اختر الملفات وأضف غلافًا اختياريًا، ثم احفظها في ملف ZIP واحد للمشاركة.</string>
+    <string name="bundle_open_help">افتح حزمة MelKit محفوظة أو مستلمة لمراجعة ملفاتها واستعادتها.</string>
+    <string name="bundle_ready">الحزمة جاهزة للمشاركة</string>
+    <string name="bundle_home">العودة إلى حزم المحتوى</string>
+    <string name="saved_location">تم الحفظ في:\n%1$s</string>
+    <string name="open_saved_folder">فتح المجلد</string>
+    <string name="saved_copy_ready">تم حفظ النسخة</string>
 </resources>
 
 

@@ -2,13 +2,14 @@ package com.spinel.melkit.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -59,6 +60,7 @@ private enum class RecoverySection(val label: Int) {
 private data class RecoveryPrompt(val title: Int, val message: Int, val path: String = "", val confirm: () -> Unit)
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun OperationHistoryScreen(library: GameLibraryViewModel, connection: GameLibraryState, guide: () -> Unit) {
     val records by library.journal.records.collectAsState()
     val profiles: ModProfilesViewModel = viewModel(key = "history-profiles")
@@ -107,8 +109,8 @@ internal fun OperationHistoryScreen(library: GameLibraryViewModel, connection: G
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.history_recovery_help))
                         if (connection.connected) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(RecoverySection.entries) { option ->
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                RecoverySection.entries.forEach { option ->
                                     FilterChip(selected = section == option, enabled = !busy, onClick = { section = option },
                                         label = { Text(stringResource(option.label)) })
                                 }

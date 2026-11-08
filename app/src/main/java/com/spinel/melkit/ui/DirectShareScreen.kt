@@ -15,6 +15,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,7 +43,9 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.spinel.melkit.R
 import com.spinel.melkit.share.*
 import com.spinel.melkit.storage.*
+import kotlinx.coroutines.flow.first
 
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewModel,
     connection: GameLibraryState, saved: SavedCopiesViewModel, copies: SavedCopiesState,
@@ -43,12 +53,30 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val context = LocalContext.current
     val pageState by model.state.collectAsState()
     val transfer by model.transfer.collectAsState()
-    var page by rememberSaveable { mutableStateOf(if (bundles) "pick" else "menu") }
+    var page by rememberSaveable { mutableStateOf(if (bundles) "bundle_menu" else "menu") }
     var source by rememberSaveable { mutableStateOf("game") }
     var pending by rememberSaveable { mutableStateOf("") }
     var editingCover by rememberSaveable { mutableStateOf(false) }
     var restore by remember { mutableStateOf<ReceivedFile?>(null) }
     var save by remember { mutableStateOf<ReceivedFile?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    val savedMessage = stringResource(R.string.saved_location, pageState.savedPath.orEmpty())
+    val openFolderLabel = stringResource(R.string.open_saved_folder)
+    val issueMessage = pageState.issue?.let { stringResource(shareErrorText(it, bundles || page == "contents")) }
+    val importedMessage = stringResource(R.string.share_imported)
+    LaunchedEffect(pageState.savedPath, pageState.issue, pageState.imported) {
+        val path = pageState.savedPath
+        when {
+            path != null -> {
+                val result = snackbar.showSnackbar(savedMessage, actionLabel = openFolderLabel,
+                    withDismissAction = true, duration = SnackbarDuration.Long)
+                if (result == SnackbarResult.ActionPerformed) openSavedFolder(context, path)
+            }
+            issueMessage != null -> snackbar.showSnackbar(issueMessage, withDismissAction = true,
+                duration = SnackbarDuration.Long)
+            pageState.imported -> snackbar.showSnackbar(importedMessage)
+        }
+    }
     val prompt = stringResource(R.string.share_scan_prompt)
     val qr = rememberLauncherForActivityResult(ScanContract()) { result ->
         val value = result.contents
@@ -118,263 +146,340 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             if (transfer.phase == "complete" && !transfer.sending) model.refreshReceived()
         }
     }
-    LaunchedEffect(page, pageState.bundleBatch) {
-        if (page == "history" || (page == "contents" && pageState.bundleBatch != null)) model.refreshReceived()
+    LaunchedEffect(pageState.bundleUri) {
+        if (bundles && pageState.bundleUri != null && page == "pick") page = "bundle_ready"
     }
-    val entryPage = if (bundles) "pick" else "menu"
+    LaunchedEffect(pageState.bundleBatch) {
+        if (bundles && pageState.bundleBatch != null) page = "contents"
+    }
+    LaunchedEffect(page, pageState.bundleBatch) {
+        if (page == "history" || (page == "contents" && pageState.bundleBatch != null)) {
+            model.state.first { !it.busy }
+            model.refreshReceived()
+        }
+    }
+    val entryPage = if (bundles) "bundle_menu" else "menu"
     val returnPage = if (!bundles && page == "contents") "history" else entryPage
     BackHandler(enabled = page != entryPage && !transfer.active && !pageState.busy) {
+        model.clearFeedback()
         page = returnPage
     }
 
-    val screen = if (!bundles && transfer.active) "transfer" else page
-    key(screen) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                Text(stringResource(when (screen) {
-                    "pick" -> if (bundles) R.string.bundle_choose else R.string.share_choose
-                    "history" -> R.string.share_received_files
-                    "contents" -> R.string.bundle_contents
-                    "transfer" -> R.string.share_transfer
-                    else -> R.string.sharing
-                }), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            }
-            if (pageState.busy || (screen == "pick" && source == "game" && connection.busy)) {
-                item { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
-            }
-            pageState.issue?.let { error -> item { ShareError(error, bundles || screen == "contents") } }
+    val screen = if (transfer.active) "transfer" else page
+    Box(Modifier.fillMaxSize()) {
+        key(screen) {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp,
+                top = 16.dp, bottom = if (screen == "pick") 100.dp else 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item {
+                    Text(stringResource(when (screen) {
+                        "pick" -> if (bundles) R.string.bundle_choose else R.string.share_choose
+                        "history" -> R.string.share_received_files
+                        "contents" -> R.string.bundle_contents
+                        "transfer" -> R.string.share_transfer
+                        "bundle_ready" -> R.string.bundle_ready
+                        "bundle_menu" -> R.string.share_bundle
+                        else -> R.string.sharing
+                    }), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                }
+                if (pageState.busy || (screen == "pick" && source == "game" && connection.busy)) {
+                    item { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
+                }
+                pageState.issue?.let { error -> item { ShareError(error, bundles || screen == "contents") } }
 
-            when (screen) {
-                "menu" -> {
-                    item {
-                        ShareCard(R.string.share_direct, R.string.sharing_description) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilledTonalButton(enabled = !pageState.busy, onClick = {
-                                    model.reset(clearQueue = true)
+                when (screen) {
+                    "bundle_menu" -> {
+                        item {
+                            ShareCard(R.string.bundle_new, R.string.bundle_new_help) {
+                                FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
+                                    model.closeBundleSession()
                                     source = "game"
                                     if (connection.connected && !connection.busy) library.browse("")
                                     page = "pick"
-                                }) { Text(stringResource(R.string.send)) }
-                                FilledTonalButton(enabled = !pageState.busy, onClick = {
-                                    model.reset(clearQueue = false)
-                                    begin("receive")
-                                }) { Text(stringResource(R.string.receive)) }
-                            }
-                            TextButton(onClick = { page = "history" }) { Text(stringResource(R.string.share_received_files)) }
-                        }
-                    }
-                    item {
-                        ShareCard(R.string.share_app_apk, R.string.share_app_apk_body) {
-                            FilledTonalButton(enabled = !pageState.busy, onClick = { model.shareApk(context) }) {
-                                Text(stringResource(R.string.share_app_apk))
-                            }
-                        }
-                    }
-                    item {
-                        ShareCard(R.string.share_project_link, R.string.share_project_body) {
-                            FilledTonalButton(enabled = !pageState.busy, onClick = { model.shareLink(context) }) {
-                                Text(stringResource(R.string.share_project_link))
-                            }
-                        }
-                    }
-                }
-                "pick" -> {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(stringResource(R.string.share_queue_count, pageState.queue.size))
-                            val canUseSelection = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy
-                            if (bundles) {
-                                pageState.draftCover?.let { CoverPreview(it, Modifier.size(88.dp)) }
-                                TextButton(enabled = !pageState.busy, onClick = { editingCover = true }) {
-                                    Text(stringResource(R.string.cover_edit))
+                                }) {
+                                    Icon(Icons.Outlined.Add, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.bundle_new))
                                 }
-                                FilledTonalButton(enabled = canUseSelection, onClick = {
-                                    bundleDestination?.launch("MelKit-Bundle.zip")
-                                }) { Text(stringResource(R.string.bundle_create)) }
+                            }
+                        }
+                        item {
+                            ShareCard(R.string.bundle_import, R.string.bundle_open_help) {
+                                OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
+                                    model.clearFeedback()
+                                    bundleSource?.launch(arrayOf("*/*"))
+                                }) {
+                                    Icon(Icons.Outlined.FolderOpen, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.bundle_import))
+                                }
+                            }
+                        }
+                    }
+                    "bundle_ready" -> {
+                        if (pageState.bundleStatus == "saved" && pageState.issue == null) item {
+                            ShareNotice(stringResource(R.string.bundle_saved))
+                        }
+                        item {
+                            ShareCard(null, null) {
+                                pageState.draftCover?.let { CoverPreview(it, Modifier.size(96.dp)) }
+                                pageState.bundleName?.let { SharePath(it) }
                                 pageState.bundleUri?.let { uri ->
-                                    Text(stringResource(R.string.bundle_saved), color = MelkitMint)
-                                    FilledTonalButton(enabled = !pageState.busy && !transfer.active,
+                                    FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy && !transfer.active,
                                         onClick = { begin("send_bundle") }) { Text(stringResource(R.string.bundle_send_direct)) }
-                                    TextButton(enabled = !pageState.busy, onClick = { model.shareBundle(context, uri) }) {
+                                    OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy,
+                                        onClick = { model.shareBundle(context, uri) }) {
+                                        Icon(Icons.Outlined.Share, null)
+                                        Spacer(Modifier.width(8.dp))
                                         Text(stringResource(R.string.share_other_apps))
                                     }
                                 }
-                                TextButton(enabled = !pageState.busy, onClick = { bundleSource?.launch(arrayOf("*/*")) }) {
-                                    Text(stringResource(R.string.bundle_import))
+                            }
+                        }
+                        item {
+                            OutlinedButton(onClick = { model.clearFeedback(); page = entryPage }) {
+                                Text(stringResource(R.string.bundle_home))
+                            }
+                        }
+                    }
+                    "menu" -> {
+                        item {
+                            ShareCard(R.string.share_direct, R.string.sharing_description) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilledTonalButton(enabled = !pageState.busy, onClick = {
+                                        model.reset(clearQueue = true)
+                                        source = "game"
+                                        if (connection.connected && !connection.busy) library.browse("")
+                                        page = "pick"
+                                    }) { Text(stringResource(R.string.send)) }
+                                    FilledTonalButton(enabled = !pageState.busy, onClick = {
+                                        model.reset(clearQueue = false)
+                                        begin("receive")
+                                    }) { Text(stringResource(R.string.receive)) }
                                 }
-                                if (pageState.bundleBatch != null) {
-                                    Text(stringResource(R.string.bundle_verified), color = MelkitMint)
-                                    TextButton(enabled = !pageState.busy, onClick = { page = "contents" }) {
-                                        Text(stringResource(R.string.bundle_contents))
+                                TextButton(onClick = { page = "history" }) { Text(stringResource(R.string.share_received_files)) }
+                            }
+                        }
+                        item {
+                            ShareCard(R.string.share_app_apk, R.string.share_app_apk_body) {
+                                FilledTonalButton(enabled = !pageState.busy, onClick = { model.shareApk(context) }) {
+                                    Text(stringResource(R.string.share_app_apk))
+                                }
+                            }
+                        }
+                        item {
+                            ShareCard(R.string.share_project_link, R.string.share_project_body) {
+                                FilledTonalButton(enabled = !pageState.busy, onClick = { model.shareLink(context) }) {
+                                    Text(stringResource(R.string.share_project_link))
+                                }
+                            }
+                        }
+                    }
+                    "pick" -> {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (bundles) {
+                                    OutlinedButton(enabled = !pageState.busy, onClick = { model.clearFeedback(); page = entryPage }) {
+                                        Text(stringResource(R.string.bundle_home))
                                     }
                                 }
-                            } else {
-                                FilledTonalButton(enabled = canUseSelection, onClick = { begin("send") }) {
-                                    Text(stringResource(R.string.share_create_qr))
+                                ShareCard(null, null) {
+                                    Text(stringResource(R.string.share_queue_count, pageState.queue.size), fontWeight = FontWeight.Bold)
+                                    if (bundles) Row(verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        pageState.draftCover?.let { CoverPreview(it, Modifier.size(64.dp)) }
+                                        OutlinedButton(enabled = !pageState.busy, onClick = { editingCover = true }) {
+                                            Text(stringResource(R.string.cover_edit))
+                                        }
+                                    }
+                                    OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
+                                        model.clearFeedback()
+                                        documents.launch(arrayOf("*/*"))
+                                    }) {
+                                        Icon(Icons.Outlined.FolderOpen, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.share_choose_documents))
+                                    }
                                 }
-                            }
-                            TextButton(enabled = !pageState.busy, onClick = { documents.launch(arrayOf("*/*")) }) {
-                                Text(stringResource(R.string.share_choose_documents))
-                            }
-                            TabRow(selectedTabIndex = if (source == "game") 0 else 1, containerColor = MelkitBackground,
-                                contentColor = MelkitMint) {
-                                Tab(selected = source == "game", onClick = { source = "game" },
-                                    text = { Text(stringResource(R.string.share_from_game)) })
-                                Tab(selected = source == "saved", onClick = {
+                                TabRow(selectedTabIndex = if (source == "game") 0 else 1, containerColor = MelkitBackground,
+                                    contentColor = MelkitMint) {
+                                    Tab(selected = source == "game", onClick = { model.clearFeedback(); source = "game" },
+                                        text = { Text(stringResource(R.string.share_from_game)) })
+                                    Tab(selected = source == "saved", onClick = {
+                                        model.clearFeedback()
                                     source = "saved"
-                                    if (Build.VERSION.SDK_INT < 29 && context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-                                        != PackageManager.PERMISSION_GRANTED) readStorage.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                                    else saved.refresh()
-                                }, text = { Text(stringResource(R.string.backups)) })
+                                        if (Build.VERSION.SDK_INT < 29 && context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                            != PackageManager.PERMISSION_GRANTED) readStorage.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                        else saved.refresh()
+                                    }, text = { Text(stringResource(R.string.backups)) })
+                                }
+                            }
+                        }
+                        if (pageState.queue.isNotEmpty()) {
+                            items(pageState.queue, key = { "queue:" + it.path }) { file ->
+                                Surface(shape = RoundedCornerShape(12.dp), color = MelkitSurface) {
+                                    Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        SharePath(file.path, Modifier.weight(1f))
+                                        IconButton(enabled = !pageState.busy, onClick = { model.remove(file.path) }) {
+                                            Icon(Icons.Outlined.Close, stringResource(R.string.share_remove))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (source == "game") {
+                            if (!connection.connected) item {
+                                Text(stringResource(R.string.saved_connect_help))
+                                FilledTonalButton(enabled = !connection.busy, onClick = library::connect) {
+                                    Text(stringResource(R.string.library_connect))
+                                }
+                                TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
+                            } else {
+                                item {
+                                    Text(stringResource(R.string.share_close_game))
+                                    if (connection.path.isNotEmpty()) OutlinedButton(enabled = !connection.busy, onClick = {
+                                        library.browse(connection.path.substringBeforeLast('/', ""))
+                                    }) { Text(stringResource(R.string.share_parent)) }
+                                    if (connection.issue != null) Text(stringResource(R.string.share_source_access))
+                                    else if (connection.loaded && connection.entries.isEmpty()) Text(stringResource(R.string.share_empty_source))
+                                }
+                                items(connection.entries.filter { it.directory || (it.regular && ShareWire.validPath(it.path) && it.size > 0) },
+                                    key = { "game:" + it.path }) { entry ->
+                                    if (entry.directory) OutlinedCard(enabled = !connection.busy, onClick = {
+                                        model.clearFeedback(); library.browse(entry.path)
+                                    }) {
+                                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            Icon(Icons.Outlined.Folder, null, tint = MelkitMint)
+                                            SharePath(entry.name, Modifier.weight(1f))
+                                        }
+                                    } else PickShareRow(entry.path, model.selected(entry.path), !connection.busy && !pageState.busy) {
+                                        model.toggleGame(entry, library)
+                                    }
+                                }
+                                if (connection.offset > 0 || connection.hasNext) item {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(enabled = !connection.busy && connection.offset > 0,
+                                            onClick = { library.browse(connection.path, (connection.offset - 40).coerceAtLeast(0)) }) {
+                                            Text(stringResource(R.string.library_previous))
+                                        }
+                                        TextButton(enabled = !connection.busy && connection.hasNext,
+                                            onClick = { library.browse(connection.path, connection.offset + 40) }) {
+                                            Text(stringResource(R.string.library_next))
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            if (copies.busy) item { CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) }
+                            if (copies.issue != null) item { Text(stringResource(R.string.share_source_access)) }
+                            else if (copies.loaded && copies.copies.none { ShareWire.validPath(it.path) }) {
+                                item { Text(stringResource(R.string.share_empty_source)) }
+                            }
+                            items(copies.copies.filter { ShareWire.validPath(it.path) }, key = { "saved:" + it.uri }) { file ->
+                                PickShareRow(file.path, model.selected(file.path), !pageState.busy) { model.toggleSaved(file) }
                             }
                         }
                     }
-                    if (pageState.queue.isNotEmpty()) {
-                        items(pageState.queue, key = { "queue:" + it.path }) { file ->
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                SharePath(file.path, Modifier.weight(1f))
-                                TextButton(enabled = !pageState.busy, onClick = { model.remove(file.path) }) {
-                                    Text(stringResource(R.string.share_remove))
+                    "transfer" -> {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                when {
+                                    transfer.phase == "complete" -> Text(stringResource(if (transfer.sending) R.string.share_sent else R.string.share_received))
+                                    transfer.phase == "cancelled" -> Text(stringResource(R.string.share_cancelled))
+                                    transfer.error.isNotEmpty() -> ShareError(transfer.error, bundles)
+                                    else -> Text(stringResource(MelKitShareService.phaseLabel(transfer.phase)))
+                                }
+                                transfer.ticket?.let { ticket ->
+                                    val image = remember(ticket) { runCatching { makeQr(ticket.encode()) }.getOrNull() }
+                                    if (image != null) Image(image.asImageBitmap(), stringResource(R.string.share_scan_prompt),
+                                        Modifier.widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f).background(Color.White))
+                                    else ShareError("BAD_QR")
+                                }
+                                transfer.progress?.let { p ->
+                                    val percent = if (transfer.phase == "complete") 100 else (p.bytes * 100 / p.total).toInt().coerceAtMost(99)
+                                    LinearProgressIndicator(progress = { percent / 100f }, modifier = Modifier.fillMaxWidth())
+                                    Text(stringResource(R.string.share_progress, percent, p.index, p.count))
+                                    SharePath(p.path)
+                                }
+                                if (transfer.active && transfer.phase != "finishing") {
+                                    TextButton(onClick = { MelKitShareService.cancel(context) }) { Text(stringResource(R.string.saved_cancel)) }
+                                } else if (!transfer.active && !pageState.busy && bundles) {
+                                    TextButton(onClick = { model.reset(clearQueue = false); page = if (pageState.bundleUri != null) "bundle_ready" else entryPage }) {
+                                        Text(stringResource(R.string.share_bundle))
+                                    }
+                                } else if (!transfer.active && !bundles) {
+                                    if (transfer.sending && pageState.queue.isNotEmpty() && transfer.phase != "complete") {
+                                        TextButton(onClick = { model.reset(clearQueue = false); page = "pick" }) {
+                                            Text(stringResource(R.string.share_choose))
+                                        }
+                                    }
+                                    FilledTonalButton(onClick = { page = "history" }) { Text(stringResource(R.string.share_received_files)) }
+                                    TextButton(onClick = { model.reset(clearQueue = false); page = "menu"; begin("receive") }) {
+                                        Text(stringResource(R.string.share_receive_next))
+                                    }
+                                    TextButton(onClick = { model.reset(clearQueue = false); page = "menu" }) {
+                                        Text(stringResource(R.string.sharing))
+                                    }
                                 }
                             }
                         }
                     }
-                    if (source == "game") {
-                        if (!connection.connected) item {
-                            Text(stringResource(R.string.saved_connect_help))
+                    "history", "contents" -> {
+                        if (screen == "contents") item {
+                            pageState.receivedCover?.let { CoverPreview(it, Modifier.size(120.dp)) }
+                            OutlinedButton(enabled = !pageState.busy, onClick = { model.clearFeedback(); page = returnPage }) {
+                                Text(stringResource(if (bundles) R.string.bundle_home else R.string.share_received_files))
+                            }
+                            if (pageState.bundleStatus == "verified") ShareNotice(stringResource(R.string.bundle_verified))
+                        }
+                        if (pageState.saved || pageState.imported) item {
+                            if (pageState.imported) {
+                                ShareNotice(stringResource(R.string.share_imported))
+                                OutlinedButton(onClick = { model.openGame(context) }) { Text(stringResource(R.string.share_open_game)) }
+                            } else pageState.savedPath?.let { path ->
+                                ShareCard(R.string.saved_copy_ready, null) {
+                                    SharePath(path)
+                                    OutlinedButton(onClick = { openSavedFolder(context, path) }) {
+                                        Text(stringResource(R.string.open_saved_folder))
+                                    }
+                                }
+                            }
+                        }
+                        val received = if (screen == "contents") pageState.received.filter { it.batch == pageState.bundleBatch }
+                            else pageState.received
+                        if (!connection.connected && received.any { ShareWire.validPath(it.path) }) item {
+                            Text(stringResource(R.string.share_restore_help))
                             FilledTonalButton(enabled = !connection.busy, onClick = library::connect) {
                                 Text(stringResource(R.string.library_connect))
                             }
                             TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
-                        } else {
-                            item {
-                                Text(stringResource(R.string.share_close_game))
-                                if (connection.path.isNotEmpty()) TextButton(enabled = !connection.busy, onClick = {
-                                    library.browse(connection.path.substringBeforeLast('/', ""))
-                                }) { Text(stringResource(R.string.share_parent)) }
-                                if (connection.issue != null) Text(stringResource(R.string.share_source_access))
-                                else if (connection.loaded && connection.entries.isEmpty()) Text(stringResource(R.string.share_empty_source))
-                            }
-                            items(connection.entries.filter { it.directory || (it.regular && ShareWire.validPath(it.path) && it.size > 0) },
-                                key = { "game:" + it.path }) { entry ->
-                                if (entry.directory) TextButton(enabled = !connection.busy, onClick = { library.browse(entry.path) }) {
-                                    SharePath(entry.path)
-                                } else PickShareRow(entry.path, model.selected(entry.path), !connection.busy && !pageState.busy) {
-                                    model.toggleGame(entry, library)
-                                }
-                            }
-                            if (connection.offset > 0 || connection.hasNext) item {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TextButton(enabled = !connection.busy && connection.offset > 0,
-                                        onClick = { library.browse(connection.path, (connection.offset - 40).coerceAtLeast(0)) }) {
-                                        Text(stringResource(R.string.library_previous))
+                        }
+                        if (!pageState.busy && received.isEmpty()) item { Text(stringResource(R.string.share_no_received)) }
+                        items(received, key = { it.batch + "/" + it.path }) { file ->
+                            ShareCard(null, null) {
+                                val archive = ShareWire.validBundlePath(file.path)
+                                SharePath(if (archive) file.file.name else file.path)
+                                Text(Formatter.formatFileSize(context, file.bytes))
+                                if (archive) {
+                                    FilledTonalButton(enabled = !pageState.busy, onClick = {
+                                        model.openReceivedBundle(file)
+                                        page = "contents"
+                                    }) { Text(stringResource(R.string.bundle_open_received)) }
+                                } else {
+                                    FilledTonalButton(enabled = !pageState.busy && connection.connected && !connection.busy,
+                                        onClick = { restore = file }) { Text(stringResource(R.string.share_import)) }
+                                    OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
+                                        if (Build.VERSION.SDK_INT < 29 && context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                            != PackageManager.PERMISSION_GRANTED) {
+                                            save = file
+                                            writeStorage.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                        } else model.save(file)
+                                    }) { Text(stringResource(R.string.share_save_downloads)) }
+                                    OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = { model.shareReceived(context, file) }) {
+                                        Text(stringResource(R.string.share_other_apps))
                                     }
-                                    TextButton(enabled = !connection.busy && connection.hasNext,
-                                        onClick = { library.browse(connection.path, connection.offset + 40) }) {
-                                        Text(stringResource(R.string.library_next))
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        if (copies.busy) item { CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp) }
-                        if (copies.issue != null) item { Text(stringResource(R.string.share_source_access)) }
-                        else if (copies.loaded && copies.copies.none { ShareWire.validPath(it.path) }) {
-                            item { Text(stringResource(R.string.share_empty_source)) }
-                        }
-                        items(copies.copies.filter { ShareWire.validPath(it.path) }, key = { "saved:" + it.uri }) { file ->
-                            PickShareRow(file.path, model.selected(file.path), !pageState.busy) { model.toggleSaved(file) }
-                        }
-                    }
-                }
-                "transfer" -> {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            when {
-                                transfer.phase == "complete" -> Text(stringResource(if (transfer.sending) R.string.share_sent else R.string.share_received))
-                                transfer.phase == "cancelled" -> Text(stringResource(R.string.share_cancelled))
-                                transfer.error.isNotEmpty() -> ShareError(transfer.error, bundles)
-                                else -> Text(stringResource(MelKitShareService.phaseLabel(transfer.phase)))
-                            }
-                            transfer.ticket?.let { ticket ->
-                                val image = remember(ticket) { runCatching { makeQr(ticket.encode()) }.getOrNull() }
-                                if (image != null) Image(image.asImageBitmap(), stringResource(R.string.share_scan_prompt),
-                                    Modifier.widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f).background(Color.White))
-                                else ShareError("BAD_QR")
-                            }
-                            transfer.progress?.let { p ->
-                                val percent = if (transfer.phase == "complete") 100 else (p.bytes * 100 / p.total).toInt().coerceAtMost(99)
-                                LinearProgressIndicator(progress = { percent / 100f }, modifier = Modifier.fillMaxWidth())
-                                Text(stringResource(R.string.share_progress, percent, p.index, p.count))
-                                SharePath(p.path)
-                            }
-                            if (transfer.active && transfer.phase != "finishing") {
-                                TextButton(onClick = { MelKitShareService.cancel(context) }) { Text(stringResource(R.string.saved_cancel)) }
-                            } else if (!transfer.active && !pageState.busy && bundles) {
-                                TextButton(onClick = { model.reset(clearQueue = false); page = "pick" }) {
-                                    Text(stringResource(R.string.share_bundle))
-                                }
-                            } else if (!transfer.active && !bundles) {
-                                if (transfer.sending && pageState.queue.isNotEmpty() && transfer.phase != "complete") {
-                                    TextButton(onClick = { model.reset(clearQueue = false); page = "pick" }) {
-                                        Text(stringResource(R.string.share_choose))
-                                    }
-                                }
-                                FilledTonalButton(onClick = { page = "history" }) { Text(stringResource(R.string.share_received_files)) }
-                                TextButton(onClick = { model.reset(clearQueue = false); page = "menu"; begin("receive") }) {
-                                    Text(stringResource(R.string.share_receive_next))
-                                }
-                                TextButton(onClick = { model.reset(clearQueue = false); page = "menu" }) {
-                                    Text(stringResource(R.string.sharing))
-                                }
-                            }
-                        }
-                    }
-                }
-                "history", "contents" -> {
-                    if (screen == "contents") item {
-                        pageState.receivedCover?.let { CoverPreview(it, Modifier.size(120.dp)) }
-                        TextButton(enabled = !pageState.busy, onClick = { page = returnPage }) {
-                            Text(stringResource(if (bundles) R.string.bundle_choose else R.string.share_received_files))
-                        }
-                    }
-                    if (pageState.saved || pageState.imported) item {
-                        Text(stringResource(if (pageState.imported) R.string.share_imported else R.string.share_saved), color = MelkitMint)
-                        if (pageState.imported) TextButton(onClick = { model.openGame(context) }) { Text(stringResource(R.string.share_open_game)) }
-                    }
-                    val received = if (screen == "contents") pageState.received.filter { it.batch == pageState.bundleBatch }
-                        else pageState.received
-                    if (!connection.connected && received.any { ShareWire.validPath(it.path) }) item {
-                        Text(stringResource(R.string.share_restore_help))
-                        FilledTonalButton(enabled = !connection.busy, onClick = library::connect) {
-                            Text(stringResource(R.string.library_connect))
-                        }
-                        TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
-                    }
-                    if (!pageState.busy && received.isEmpty()) item { Text(stringResource(R.string.share_no_received)) }
-                    items(received, key = { it.batch + "/" + it.path }) { file ->
-                        ShareCard(null, null) {
-                            val archive = ShareWire.validBundlePath(file.path)
-                            SharePath(if (archive) file.file.name else file.path)
-                            Text(Formatter.formatFileSize(context, file.bytes))
-                            if (archive) {
-                                FilledTonalButton(enabled = !pageState.busy, onClick = {
-                                    model.openReceivedBundle(file)
-                                    page = "contents"
-                                }) { Text(stringResource(R.string.bundle_open_received)) }
-                            } else {
-                                FilledTonalButton(enabled = !pageState.busy && connection.connected && !connection.busy,
-                                    onClick = { restore = file }) { Text(stringResource(R.string.share_import)) }
-                                TextButton(enabled = !pageState.busy, onClick = {
-                                    if (Build.VERSION.SDK_INT < 29 && context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                                        != PackageManager.PERMISSION_GRANTED) {
-                                        save = file
-                                        writeStorage.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                                    } else model.save(file)
-                                }) { Text(stringResource(R.string.share_save_downloads)) }
-                                TextButton(enabled = !pageState.busy, onClick = { model.shareReceived(context, file) }) {
-                                    Text(stringResource(R.string.share_other_apps))
                                 }
                             }
                         }
@@ -382,6 +487,18 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 }
             }
         }
+        if (screen == "pick") {
+            Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), color = MelkitSurface, shadowElevation = 4.dp) {
+                FilledTonalButton(modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    enabled = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy, onClick = {
+                        if (bundles) {
+                            model.clearFeedback()
+                            bundleDestination?.launch("MelKit-Bundle.zip")
+                        } else begin("send")
+                    }) { Text(stringResource(if (bundles) R.string.bundle_create else R.string.share_create_qr)) }
+            }
+        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
     }
     if (bundles && editingCover) {
         CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
@@ -426,8 +543,24 @@ private fun ShareCard(title: Int?, description: Int?, body: @Composable ColumnSc
 }
 
 @Composable
+private fun ShareNotice(message: String, error: Boolean = false) {
+    val colors = MaterialTheme.colorScheme
+    Card(colors = CardDefaults.cardColors(containerColor = if (error) colors.errorContainer else MelkitSurface)) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(if (error) Icons.Outlined.ErrorOutline else Icons.Outlined.CheckCircle, null,
+                tint = if (error) colors.onErrorContainer else MelkitMint)
+            Text(message, Modifier.weight(1f), color = if (error) colors.onErrorContainer else colors.onSurface)
+        }
+    }
+}
+
+@Composable
 private fun ShareError(code: String, bundles: Boolean = false) {
-    val message = when (code) {
+    ShareNotice(stringResource(shareErrorText(code, bundles)), error = true)
+}
+
+private fun shareErrorText(code: String, bundles: Boolean): Int {
+    return when (code) {
         "PERMISSION", "STORAGE_PERMISSION" -> R.string.share_permission
         "WIFI_OFF" -> R.string.share_wifi_off
         "LOCATION_OFF" -> R.string.share_location
@@ -449,7 +582,6 @@ private fun ShareError(code: String, bundles: Boolean = false) {
         "SPLIT_APK" -> R.string.share_split_apk
         else -> if (bundles) R.string.bundle_failed else R.string.share_failed
     }
-    Text(stringResource(message), color = MaterialTheme.colorScheme.error)
 }
 
 private fun makeQr(value: String): Bitmap {

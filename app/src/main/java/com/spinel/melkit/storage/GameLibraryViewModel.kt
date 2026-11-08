@@ -70,6 +70,7 @@ data class GameLibraryState(
     val issue: LibraryIssue? = null,
     val proof: ReadProof? = null,
     val previewRevision: Int = 0,
+    val connectionNotice: LibraryIssue? = null,
 )
 
 /** Owns Shizuku listeners and transfers across rotations; releases the process on exit. */
@@ -104,7 +105,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                 return
             }
             remote = IGameLibrary.Stub.asInterface(binder)
-            mutableState.update { it.copy(connected = true) }
+            mutableState.update { it.copy(connected = true, connectionNotice = null) }
             loadFolder(mutableState.value.path, 0)
         }
 
@@ -132,6 +133,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
 
     fun connect() {
         if (mutableState.value.busy) return
+        dismissConnectionNotice()
         try {
             when {
                 !Shizuku.pingBinder() -> fail(LibraryIssue.START_SHIZUKU)
@@ -147,6 +149,8 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
             fail(LibraryIssue.CONNECT_FAILED)
         }
     }
+
+    fun dismissConnectionNotice() { mutableState.update { it.copy(connectionNotice = null) } }
 
     private fun bind() {
         mutableState.update { it.copy(busy = true, issue = null) }
@@ -449,7 +453,8 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     private fun fail(issue: LibraryIssue) {
         val disconnected = issue == LibraryIssue.START_SHIZUKU || issue == LibraryIssue.UPDATE_SHIZUKU ||
             issue == LibraryIssue.PERMISSION_DENIED || issue == LibraryIssue.CONNECT_FAILED
-        mutableState.update { it.copy(busy = false, issue = issue, connected = it.connected && !disconnected) }
+        mutableState.update { it.copy(busy = false, issue = issue, connected = it.connected && !disconnected,
+            connectionNotice = if (disconnected) issue else it.connectionNotice) }
     }
 
     private fun disconnected() {
@@ -457,7 +462,8 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         remote = null
         operation?.cancel()
         bindTimeout?.cancel()
-        mutableState.update { it.copy(connected = false, busy = false, issue = LibraryIssue.START_SHIZUKU) }
+        mutableState.update { it.copy(connected = false, busy = false, issue = LibraryIssue.START_SHIZUKU,
+            connectionNotice = LibraryIssue.START_SHIZUKU) }
     }
 
     override fun onCleared() {

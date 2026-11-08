@@ -42,6 +42,7 @@ import java.util.zip.ZipException
 internal data class ReceivedFile(val file: File, val path: String, val batch: String, val bytes: Long)
 internal data class SharePage(val queue: List<ShareInput> = emptyList(), val received: List<ReceivedFile> = emptyList(),
     val busy: Boolean = false, val issue: String? = null, val imported: Boolean = false, val saved: Boolean = false,
+    val savedPath: String? = null, val bundleStatus: String? = null, val bundleName: String? = null,
     val bundleUri: Uri? = null, val bundleBatch: String? = null,
     val draftCover: Bitmap? = null, val receivedCover: Bitmap? = null)
 
@@ -51,28 +52,48 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     private val mutableState = MutableStateFlow(SharePage())
     val state = mutableState.asStateFlow()
     val transfer = MelKitShareService.state
+    private var resetWhenIdle = false
 
-    private fun run(task: suspend () -> Unit) {
+    private fun run(clearMessages: Boolean = true, task: suspend () -> Unit) {
         if (mutableState.value.busy) return
-        mutableState.update { it.copy(busy = true, issue = null, saved = false, imported = false) }
+        if (clearMessages) clearFeedback()
+        mutableState.update { it.copy(busy = true) }
         viewModelScope.launch {
             try { task() }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) {
                 issue(error.message?.takeIf { it.matches(Regex("[A-Z_]+")) } ?: "IO")
-            } finally { mutableState.update { it.copy(busy = false) } }
+            } finally {
+                mutableState.update { it.copy(busy = false) }
+                if (resetWhenIdle) closeBundleSession()
+            }
         }
     }
 
-    fun issue(code: String?) { mutableState.update { it.copy(issue = code) } }
+    fun clearFeedback() { mutableState.update { it.copy(issue = null, saved = false, imported = false,
+        savedPath = null, bundleStatus = null) } }
+
+    fun issue(code: String?) {
+        clearFeedback()
+        mutableState.update { it.copy(issue = code) }
+    }
+
+    fun closeBundleSession() {
+        if (mutableState.value.busy) { resetWhenIdle = true; return }
+        resetWhenIdle = false
+        // Session state only. Published Downloads and verified received files remain on disk.
+        mutableState.value = SharePage()
+    }
 
     fun remove(path: String) {
+        clearFeedback()
         val key = ShareWire.pathKey(path)
         mutableState.update { it.copy(queue = it.queue.filterNot { item -> ShareWire.pathKey(item.path) == key },
             issue = null, bundleUri = null) }
     }
 
     private fun add(input: ShareInput) {
+        clearFeedback()
         val queue = mutableState.value.queue
         val key = ShareWire.pathKey(input.path)
         when {
@@ -122,6 +143,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         else context.contentResolver.openInputStream(uri) ?: throw IOException("SOURCE_ACCESS")
 
     fun setBundleCover(cover: Bitmap?) {
+        clearFeedback()
         mutableState.update { it.copy(draftCover = cover, bundleUri = null) }
     }
 
@@ -150,10 +172,18 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 throw error
             }
         }
-        mutableState.update { it.copy(bundleUri = destination) }
+        val name = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.query(destination, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                }
+            }.getOrNull()
+        }
+        mutableState.update { it.copy(bundleUri = destination, bundleStatus = "saved", bundleName = name) }
     }
 
     fun importBundle(uri: Uri) = run {
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null) }
         val (batch, cover) = runInterruptible(Dispatchers.IO) {
             withBundleArchive { archive ->
                 open(uri).use { source ->
@@ -162,14 +192,14 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 unpackBundle(archive)
             }
         }
-        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover) }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
     }
 
     fun openReceivedBundle(item: ReceivedFile) = run {
         mutableState.update { it.copy(bundleBatch = null, receivedCover = null) }
         val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}".toByteArray()).toString()
         val (batch, cover) = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
-        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover) }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
     }
 
     private fun unpackBundle(archive: File, id: String = UUID.randomUUID().toString()): Pair<String, Bitmap?> {
@@ -202,6 +232,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun shareBundle(activity: Context, uri: Uri) {
+        clearFeedback()
         runCatching { shareUri(activity, uri, "application/zip", "MelKit") }.onFailure { issue("IO") }
     }
 
@@ -233,7 +264,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         return true
     }
 
-    fun refreshReceived() = run {
+    fun refreshReceived() = run(clearMessages = false) {
         val files = withContext(Dispatchers.IO) {
             val root = MelKitShareService.receivedDirectory(context)
             root.listFiles().orEmpty().filter { it.isDirectory && ShareWire.validBatchId(it.name) }
@@ -258,7 +289,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun save(item: ReceivedFile) = run {
-        withContext(Dispatchers.IO) {
+        val path = withContext(Dispatchers.IO) {
             val copy = DownloadCopy.create(context, item.path)
             try {
                 val sent = MessageDigest.getInstance("SHA-256")
@@ -270,16 +301,19 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                     java.security.DigestInputStream(input, readBack).use { it.copyTo(DiscardOutput) }
                 }
                 check(bytes == item.bytes && count == bytes && MessageDigest.isEqual(sent.digest(), readBack.digest())) { "CHECKSUM" }
-                journal.add(OperationKind.COPY, copy.publish())
+                val published = copy.publish()
+                journal.add(OperationKind.COPY, published)
+                published
             } catch (error: Exception) {
                 runCatching { copy.remove() }
                 throw error
             }
         }
-        mutableState.update { it.copy(saved = true) }
+        mutableState.update { it.copy(saved = true, savedPath = path) }
     }
 
     fun shareReceived(activity: Context, item: ReceivedFile) {
+        clearFeedback()
         runCatching { shareFile(activity, item.file, "application/octet-stream") }.onFailure { issue("IO") }
     }
 
@@ -315,8 +349,9 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun shareLink(activity: Context) {
+        clearFeedback()
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-            .putExtra(Intent.EXTRA_TEXT, "https://github.com/ibrmsaed87-cell/MelKit")
+            .putExtra(Intent.EXTRA_TEXT, "https://play.google.com/store/apps/details?id=" + context.packageName)
         runCatching { activity.startActivity(Intent.createChooser(send, null)) }.onFailure { issue("IO") }
     }
 
@@ -329,7 +364,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     fun reset(clearQueue: Boolean) {
         MelKitShareService.reset()
         mutableState.update { it.copy(queue = if (clearQueue) emptyList() else it.queue,
-            issue = null, saved = false, imported = false) }
+            issue = null, saved = false, imported = false, savedPath = null, bundleStatus = null) }
     }
 
     private object DiscardOutput : java.io.OutputStream() {

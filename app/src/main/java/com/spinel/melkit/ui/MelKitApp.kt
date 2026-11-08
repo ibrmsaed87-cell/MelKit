@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -123,6 +124,7 @@ private val features = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MelKitApp(shareRequest: Int = 0) {
+    val context = LocalContext.current
     val libraryModel: GameLibraryViewModel = viewModel()
     val libraryState by libraryModel.state.collectAsState()
     val savedModel: SavedCopiesViewModel = viewModel()
@@ -134,6 +136,7 @@ fun MelKitApp(shareRequest: Int = 0) {
     val scanModel: FileScanViewModel = viewModel()
     val scanState by scanModel.state.collectAsState()
     val shareModel: ShareViewModel = viewModel()
+    val bundleModel: ShareViewModel = viewModel(key = "bundles")
     val organization: LibraryOrganizationViewModel = viewModel()
     val labels by organization.labels.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
@@ -147,6 +150,9 @@ fun MelKitApp(shareRequest: Int = 0) {
     }
     val root = destinations.any { it.route == route }
     val selectedRoot = if (root) route else parent
+    LaunchedEffect(route) {
+        if (route != "bundles") bundleModel.closeBundleSession()
+    }
     val navigate: (String) -> Unit = { target ->
         if (destinations.any { it.route == route }) parent = route
         route = target
@@ -217,7 +223,6 @@ fun MelKitApp(shareRequest: Int = 0) {
                 } else if (route == "share") {
                     DirectShareScreen(shareModel, libraryModel, libraryState, savedModel, savedState) { navigate("shizuku") }
                 } else if (route == "bundles") {
-                    val bundleModel: ShareViewModel = viewModel(key = "bundles")
                     DirectShareScreen(bundleModel, libraryModel, libraryState, savedModel, savedState, bundles = true) {
                         navigate("shizuku")
                     }
@@ -254,6 +259,24 @@ fun MelKitApp(shareRequest: Int = 0) {
                 }
             }
         }
+    }
+    libraryState.connectionNotice?.let { issue ->
+        AlertDialog(onDismissRequest = libraryModel::dismissConnectionNotice,
+            title = { Text(stringResource(R.string.library_connect)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(issueText(issue)))
+                    TextButton(onClick = { libraryModel.dismissConnectionNotice(); navigate("shizuku") }) {
+                        Text(stringResource(R.string.shizuku_guide))
+                    }
+                }
+            }, confirmButton = {
+                TextButton(onClick = { libraryModel.dismissConnectionNotice(); openShizuku(context) }) {
+                    Text(stringResource(R.string.open_shizuku))
+                }
+            }, dismissButton = {
+                TextButton(onClick = libraryModel::dismissConnectionNotice) { Text(stringResource(R.string.saved_cancel)) }
+            })
     }
 }
 
