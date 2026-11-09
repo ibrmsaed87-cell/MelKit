@@ -1,4 +1,10 @@
 <resources>
+    <string name="notifications_channel">App updates</string>
+    <string name="notifications_description">Receive MelKit news and app links. Tap a notification to open its app page on Google Play.</string>
+    <string name="notifications_enabled">Notifications are enabled</string>
+    <string name="notifications_disabled">Notifications are off</string>
+    <string name="notifications_manage">Manage notifications</string>
+    <string name="notifications_fallback_body">See the latest updates and apps.</string>
     <string name="app_name" translatable="false">MelKit</string>
     <string name="language_arabic" translatable="false">العربية</string>
     <string name="language_english" translatable="false">English</string>
@@ -190,7 +196,14 @@
     <string name="saved_confirm_title">Restore this file?</string>
     <string name="saved_confirm_body">Close Melon Sandbox first. The saved copy will stay in Downloads. A file with the same name in the game will be kept unchanged.</string>
     <string name="saved_cancel">Cancel</string>
-    <string name="saved_exists">A file with this name already exists in the game and was kept unchanged. Choose a saved copy with a different filename.</string>
+    <string name="saved_exists">A file with this name already exists in the game and was kept unchanged. Restore a new copy with a numbered name to keep both files.</string>
+    <string name="saved_exists_title">Keep both files?</string>
+    <string name="saved_restore_copy">Restore as a new copy</string>
+    <string name="library_counts_failed">Could not read the file counts. Try refreshing.</string>
+    <string name="library_count_unavailable">Unavailable</string>
+    <string name="file_actions">File actions</string>
+    <string name="file_details">File details</string>
+    <string name="file_type_size">%1$s · %2$s</string>
     <string name="saved_restore_error">Could not complete and verify the restore. The saved copy is unchanged.</string>
     <string name="saved_partial">The restore did not finish and its new file could not be removed. Check the destination before trying again. The saved copy is unchanged.</string>
     <string name="saved_restored">File restored and verified</string>

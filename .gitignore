@@ -20,6 +20,8 @@ local.properties
 keystore.properties
 signing.properties
 google-services.json
+# Approved Firebase Android client configuration; never server/admin credentials.
+!app/google-services.json
 *secrets*.json
 *service-account*.json
 

@@ -29,6 +29,8 @@ validate_foundation:
     - bash -n ci/build-android.sh
     - bash -n ci/setup-android.sh
     - bash -n ci/check-content-paths.sh
+    - bash -n ci/check-firebase.sh
+    - bash ci/check-firebase.sh
     - test -s docs/signing-certificate.sha256
     - |
       if [ -z "${MELKIT_SIGNING_BUNDLE:-}${MELKIT_KEYSTORE_BASE64:-}" ]; then

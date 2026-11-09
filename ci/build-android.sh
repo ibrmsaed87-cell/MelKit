@@ -68,6 +68,7 @@ fi
 # The Android module uses the signing/version environment variables above.
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$CI_PROJECT_DIR/.gradle}"
 bash ci/check-content-paths.sh
+bash ci/check-firebase.sh
 source ci/setup-android.sh
 
 chmod +x gradlew

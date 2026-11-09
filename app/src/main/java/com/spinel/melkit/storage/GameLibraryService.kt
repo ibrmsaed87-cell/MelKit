@@ -54,6 +54,14 @@ class GameLibraryService : IGameLibrary.Stub() {
         metadata(paths(storageRoot).resolve(relativePath, false), relativePath)
     }
 
+    @Synchronized
+    override fun contentCounts(storageRoot: String): String = response {
+        val policy = paths(storageRoot)
+        Os.stat(policy.resolve("", true).path)
+        val counts = ContentCounts.read(policy.resolve("", true))
+        JSONObject().put("mods", counts.mods).put("maps", counts.maps).put("saves", counts.saves)
+    }
+
     override fun openRead(storageRoot: String, relativePath: String): ParcelFileDescriptor {
         val file = paths(storageRoot).resolve(relativePath, false)
         check(OsConstants.S_ISREG(Os.stat(file.path).st_mode))
@@ -70,14 +78,28 @@ class GameLibraryService : IGameLibrary.Stub() {
 
     @Synchronized
     override fun restoreFile(storageRoot: String, relativePath: String, source: ParcelFileDescriptor,
-        expectedBytes: Long, expectedSha: String): String {
+        expectedBytes: Long, expectedSha: String): String =
+        restore(storageRoot, relativePath, source, expectedBytes, expectedSha, false)
+
+    @Synchronized
+    override fun restoreFileAsCopy(storageRoot: String, relativePath: String, source: ParcelFileDescriptor,
+        expectedBytes: Long, expectedSha: String): String =
+        restore(storageRoot, relativePath, source, expectedBytes, expectedSha, true)
+
+    private fun restore(storageRoot: String, relativePath: String, source: ParcelFileDescriptor,
+        expectedBytes: Long, expectedSha: String, asCopy: Boolean): String {
         return ParcelFileDescriptor.AutoCloseInputStream(source).use { input ->
             try {
                 val policy = paths(storageRoot)
                 policy.resolve(relativePath, false)
                 if (isModPath(relativePath)) checkModRecovery(storageRoot)
-                NewFileRestore.restore(policy.resolve("", true), relativePath, input, expectedBytes, expectedSha)
-                JSONObject().put("status", "ok").toString()
+                val actualPath = if (asCopy) {
+                    NewFileRestore.restoreAsCopy(policy.resolve("", true), relativePath, input, expectedBytes, expectedSha)
+                } else {
+                    NewFileRestore.restore(policy.resolve("", true), relativePath, input, expectedBytes, expectedSha)
+                    relativePath
+                }
+                JSONObject().put("status", "ok").put("path", actualPath).toString()
             } catch (_: ModProfiles.NeedsRecovery) {
                 JSONObject().put("status", "recovery").toString()
             } catch (_: NewFileRestore.AlreadyExists) {
@@ -345,7 +367,9 @@ class GameLibraryService : IGameLibrary.Stub() {
         JSONObject().put("status", "unreadable").toString()
     }
 
-    companion object { const val PAGE_SIZE = 40 }
+    companion object {
+        const val PAGE_SIZE = 40
+    }
 }
 
 

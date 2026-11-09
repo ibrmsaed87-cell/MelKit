@@ -30,6 +30,7 @@
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTop"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -43,6 +44,15 @@
             android:name=".share.MelKitShareService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+        <service android:name=".push.MelKitMessagingService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="melkit_updates" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
         <activity
             android:name=".share.MelKitShareCaptureActivity"
             android:exported="false"

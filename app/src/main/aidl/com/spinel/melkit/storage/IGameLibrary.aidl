@@ -17,6 +17,9 @@ interface IGameLibrary {
     byte[] readModPreview(String storageRoot, String relativePath, String vaultId) = 8;
     String profiles(String storageRoot, String action, String payload) = 9;
     String scanFiles(String storageRoot, String action, String payload) = 10;
+    String contentCounts(String storageRoot) = 11;
+    String restoreFileAsCopy(String storageRoot, String relativePath, in ParcelFileDescriptor source,
+        long expectedBytes, String expectedSha) = 12;
 }
 
 

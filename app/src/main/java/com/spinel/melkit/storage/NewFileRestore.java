@@ -26,12 +26,23 @@ public final class NewFileRestore {
 
     public static void restore(File gameRoot, String path, InputStream source,
             long expectedBytes, String expectedSha) throws Exception {
+        restoreNew(gameRoot, path, source, expectedBytes, expectedSha, false);
+    }
+
+    /** Keeps both files, reserving a numbered name only after verifying the source. */
+    public static String restoreAsCopy(File gameRoot, String path, InputStream source,
+            long expectedBytes, String expectedSha) throws Exception {
+        return restoreNew(gameRoot, path, source, expectedBytes, expectedSha, true);
+    }
+
+    private static String restoreNew(File gameRoot, String path, InputStream source,
+            long expectedBytes, String expectedSha, boolean asCopy) throws Exception {
         if (!supported(path) || expectedBytes < 0 || expectedSha == null
                 || !expectedSha.matches("[a-f0-9]{64}")) throw new SecurityException("Invalid restore request");
         if (!gameRoot.isDirectory()) throw new IOException("Game folder missing");
         ContentPaths paths = new ContentPaths(gameRoot);
         File target = paths.resolve(path, false);
-        if (target.exists()) throw new AlreadyExists();
+        if (!asCopy && target.exists()) throw new AlreadyExists();
         File parent = target.getParentFile();
         if (!parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
             throw new IOException("Cannot create game content folder");
@@ -57,12 +68,30 @@ public final class NewFileRestore {
             if (bytes != expectedBytes || !hex(sha.digest()).equals(expectedSha)) throw new SourceChanged();
             verify(staging, expectedBytes, expectedSha);
             // Reserve atomically, including a second collision check after copying.
-            if (!target.createNewFile()) throw new AlreadyExists();
+            if (asCopy) {
+                String directory = path.substring(0, path.lastIndexOf('/') + 1);
+                String name = path.substring(path.lastIndexOf('/') + 1);
+                int dot = name.lastIndexOf('.');
+                String stem = name.substring(0, dot);
+                String extension = name.substring(dot);
+                for (int index = 1; index < 10000; index++) {
+                    String candidate = directory + stem + " (" + index + ")" + extension;
+                    File next = paths.resolve(candidate, false);
+                    if (next.createNewFile()) {
+                        target = next;
+                        path = candidate;
+                        reserved = true;
+                        break;
+                    }
+                }
+                if (!reserved) throw new IOException("Too many restored copies");
+            } else if (!target.createNewFile()) throw new AlreadyExists();
             reserved = true;
             // This replaces only the empty reservation owned by this operation.
             if (!staging.renameTo(target)) throw new IOException("Cannot publish restored file");
             verify(target, expectedBytes, expectedSha);
             success = true;
+            return path;
         } finally {
             boolean cleaned = true;
             if (!success && reserved && target.exists()) cleaned = target.delete();

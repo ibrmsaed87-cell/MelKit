@@ -58,6 +58,9 @@ enum class LibraryIssue {
 data class ReadProof(val name: String, val bytes: Long, val sha256: String, val exported: Boolean,
     val savedPath: String? = null)
 
+data class LibraryCounts(val mods: Int, val maps: Int, val saves: Int)
+data class RestoreOutcome(val status: String, val path: String? = null)
+
 data class GameLibraryState(
     val connected: Boolean = false,
     val loaded: Boolean = false,
@@ -71,6 +74,9 @@ data class GameLibraryState(
     val proof: ReadProof? = null,
     val previewRevision: Int = 0,
     val connectionNotice: LibraryIssue? = null,
+    val counts: LibraryCounts? = null,
+    val countsLoading: Boolean = false,
+    val countsIssue: LibraryIssue? = null,
 )
 
 /** Owns Shizuku listeners and transfers across rotations; releases the process on exit. */
@@ -84,6 +90,7 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     private var binding = false
     private var operation: Job? = null
     private var bindTimeout: Job? = null
+    private var countsJob: Job? = null
     private var pendingExport: GameEntry? = null
     private data class PreviewResult(val bitmap: Bitmap?)
     private val previewMutex = Mutex()
@@ -180,6 +187,26 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         if (!mutableState.value.busy && mutableState.value.connected) loadFolder(path, offset)
     }
 
+    fun refreshCounts() {
+        if (!mutableState.value.connected || mutableState.value.busy) return
+        val service = authorizedService() ?: return
+        countsJob?.cancel()
+        countsJob = viewModelScope.launch {
+            mutableState.update { it.copy(counts = null, countsLoading = true, countsIssue = null) }
+            try {
+                val result = withContext(Dispatchers.IO) { checked(service.contentCounts(storageRoot)) }
+                val counts = LibraryCounts(result.getInt("mods"), result.getInt("maps"), result.getInt("saves"))
+                require(counts.mods >= 0 && counts.maps >= 0 && counts.saves >= 0)
+                mutableState.update { it.copy(counts = counts, countsLoading = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                mutableState.update { it.copy(counts = null, countsLoading = false,
+                    countsIssue = (error as? AccessFailure)?.issue ?: LibraryIssue.READ_FAILED) }
+            }
+        }
+    }
+
     private fun loadFolder(path: String, offset: Int) {
         val service = authorizedService() ?: return
         operation = viewModelScope.launch {
@@ -228,26 +255,33 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    suspend fun restoreSaved(path: String, expectedBytes: Long, openSource: () -> ParcelFileDescriptor): String {
-        if (mutableState.value.busy) return "busy"
-        val service = authorizedService() ?: return "connect"
+    suspend fun restoreSaved(path: String, expectedBytes: Long, openSource: () -> ParcelFileDescriptor): String =
+        restoreSavedResult(path, expectedBytes, false, openSource).status
+
+    suspend fun restoreSavedResult(path: String, expectedBytes: Long, asCopy: Boolean,
+        openSource: () -> ParcelFileDescriptor): RestoreOutcome {
+        if (mutableState.value.busy) return RestoreOutcome("busy")
+        val service = authorizedService() ?: return RestoreOutcome("connect")
         mutableState.update { it.copy(busy = true, issue = null) }
         return try {
             withContext(Dispatchers.IO) {
                 val proof = ParcelFileDescriptor.AutoCloseInputStream(openSource()).use { digest(it) }
-                if (proof.first != expectedBytes) return@withContext "changed"
-                val status = openSource().use { descriptor ->
-                    JSONObject(service.restoreFile(storageRoot, path, descriptor, proof.first, proof.second)).getString("status")
+                if (proof.first != expectedBytes) return@withContext RestoreOutcome("changed")
+                val result = openSource().use { descriptor ->
+                    JSONObject(if (asCopy) service.restoreFileAsCopy(storageRoot, path, descriptor, proof.first, proof.second)
+                        else service.restoreFile(storageRoot, path, descriptor, proof.first, proof.second))
                 }
-                if (status == "ok") journal.add(OperationKind.RESTORE, path)
-                status
+                val status = result.getString("status")
+                val actualPath = if (status == "ok") result.getString("path") else null
+                if (actualPath != null) journal.add(OperationKind.RESTORE, actualPath)
+                RestoreOutcome(status, actualPath)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            "failed"
+            RestoreOutcome("failed")
         } finally {
-            mutableState.update { it.copy(busy = false) }
+            mutableState.update { it.copy(busy = false, previewRevision = it.previewRevision + 1) }
         }
     }
 
@@ -313,10 +347,15 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         if (mutableState.value.busy) return JSONObject().put("status", "busy")
         val service = authorizedService() ?: return JSONObject().put("status", "connect")
         mutableState.update { it.copy(busy = true, issue = null) }
-        return try { withContext(Dispatchers.IO) { JSONObject(block(service)).also(onResult) } }
-        catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { JSONObject().put("status", "incomplete") }
-        finally { mutableState.update { it.copy(busy = false, previewRevision = it.previewRevision + 1) } }
+        return try {
+            withContext(Dispatchers.IO) { JSONObject(block(service)).also(onResult) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            JSONObject().put("status", "incomplete")
+        } finally {
+            mutableState.update { it.copy(busy = false, previewRevision = it.previewRevision + 1) }
+        }
     }
 
     suspend fun previewMod(entry: VaultMod, revision: Int): Bitmap? {
@@ -328,8 +367,8 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                     val service = remote ?: return@withContext null
                     if (!service.asBinder().pingBinder()) return@withContext null
                     PreviewBitmap.decode(service.readModPreview(storageRoot, entry.path, entry.id))
-                } catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { null }
+                } catch (cancelled: CancellationException) { throw cancelled
+                } catch (_: Exception) { null }
             }
             previews.put(key, PreviewResult(bitmap))
             bitmap
@@ -454,16 +493,20 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         val disconnected = issue == LibraryIssue.START_SHIZUKU || issue == LibraryIssue.UPDATE_SHIZUKU ||
             issue == LibraryIssue.PERMISSION_DENIED || issue == LibraryIssue.CONNECT_FAILED
         mutableState.update { it.copy(busy = false, issue = issue, connected = it.connected && !disconnected,
-            connectionNotice = if (disconnected) issue else it.connectionNotice) }
+            connectionNotice = if (disconnected) issue else it.connectionNotice,
+            counts = if (disconnected) null else it.counts,
+            countsLoading = if (disconnected) false else it.countsLoading) }
+        if (disconnected) countsJob?.cancel()
     }
 
     private fun disconnected() {
         binding = false
         remote = null
         operation?.cancel()
+        countsJob?.cancel()
         bindTimeout?.cancel()
         mutableState.update { it.copy(connected = false, busy = false, issue = LibraryIssue.START_SHIZUKU,
-            connectionNotice = LibraryIssue.START_SHIZUKU) }
+            connectionNotice = LibraryIssue.START_SHIZUKU, counts = null, countsLoading = false, countsIssue = null) }
     }
 
     override fun onCleared() {
@@ -476,7 +519,9 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private class AccessFailure(val issue: LibraryIssue) : IOException()
-    companion object { private const val REQUEST_ACCESS = 201 }
+    companion object {
+        private const val REQUEST_ACCESS = 201
+    }
 }
 
 
