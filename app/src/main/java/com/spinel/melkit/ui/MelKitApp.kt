@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Collections
@@ -78,10 +78,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -470,24 +473,29 @@ private fun ToolCard(title: Int, description: Int, icon: ImageVector, planned: B
 
 @Composable
 private fun MoreAppsScreen() {
-    PromoCard(R.string.mmix_name, R.string.mmix_description, "https://play.google.com/store/apps/details?id=com.spinel.mmix", MelkitMint)
-    PromoCard(R.string.mcfx_name, R.string.mcfx_description, "https://play.google.com/store/apps/details?id=com.spinel.mcpackfixer", Color(0xFF86CDFF))
-    PromoCard(R.string.mmkb_name, R.string.mmkb_description, null, Color(0xFFFFC987))
-    PromoCard(R.string.more_apps, R.string.developer_description, "https://play.google.com/store/apps/dev?id=7189513262046406321", Color(0xFFCAB4FF))
+    PromoCard(R.string.mmix_name, R.string.mmix_description, "https://play.google.com/store/apps/details?id=com.spinel.mmix",
+        MelkitMint, R.drawable.promo_mmix)
+    PromoCard(R.string.mcfx_name, R.string.mcfx_description, "https://play.google.com/store/apps/details?id=com.spinel.mcpackfixer",
+        Color(0xFF86CDFF), R.drawable.promo_mcfx)
+    PromoCard(R.string.mmkb_name, R.string.mmkb_description, "https://play.google.com/store/apps/details?id=com.spinel.mcbk",
+        Color(0xFFFFC987), R.drawable.promo_mmkb)
+    PromoCard(R.string.more_apps, R.string.developer_description, "https://play.google.com/store/apps/dev?id=7189513262046406321",
+        Color(0xFFCAB4FF), R.drawable.promo_play)
 }
 
 @Composable
-private fun PromoCard(title: Int, description: Int, url: String?, accent: Color) {
+private fun PromoCard(title: Int, description: Int, url: String, accent: Color, icon: Int) {
     val context = LocalContext.current
     Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface, border = BorderStroke(1.dp, accent.copy(alpha = 0.25f))) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Outlined.Apps, null, tint = accent, modifier = Modifier.size(28.dp))
+                Image(painter = painterResource(icon), contentDescription = null, contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)))
                 Text(stringResource(title), color = accent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
             MutedText(description)
-            FilledTonalButton(onClick = { url?.let { openExternal(context, it) } }, enabled = url != null) {
-                Text(stringResource(if (url == null) R.string.coming_to_store else R.string.open_store))
+            FilledTonalButton(onClick = { openExternal(context, url) }) {
+                Text(stringResource(R.string.open_store))
             }
         }
     }
@@ -541,7 +549,6 @@ private fun SettingsScreen() {
         }
     }
     ToolText(R.string.appearance, R.string.dark_theme)
-    NotificationSettings()
     Text(stringResource(R.string.version, BuildConfig.VERSION_NAME), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

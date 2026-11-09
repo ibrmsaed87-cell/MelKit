@@ -136,7 +136,7 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
             title = { Text(stringResource(R.string.saved_confirm_title)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(copy.name)
+                    Text(copy.name, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.ContentOrLtr))
                     Text(stringResource(R.string.saved_confirm_body))
                     Text(copy.path, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr))
                 }

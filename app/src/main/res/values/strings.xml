@@ -1,9 +1,6 @@
 <resources>
     <string name="notifications_channel">App updates</string>
     <string name="notifications_description">Receive MelKit news and app links. Tap a notification to open its app page on Google Play.</string>
-    <string name="notifications_enabled">Notifications are enabled</string>
-    <string name="notifications_disabled">Notifications are off</string>
-    <string name="notifications_manage">Manage notifications</string>
     <string name="notifications_fallback_body">See the latest updates and apps.</string>
     <string name="app_name" translatable="false">MelKit</string>
     <string name="language_arabic" translatable="false">العربية</string>
@@ -133,7 +130,7 @@
     <string name="coming_to_store">Coming to Google Play</string>
     <string name="mmix_name" translatable="false">MMIX</string>
     <string name="mcfx_name" translatable="false">MCFX</string>
-    <string name="mmkb_name" translatable="false">MMKB</string>
+    <string name="mmkb_name" translatable="false">MCBK</string>
     <string name="mmix_description">Import Melon Sandbox mods, maps, and files easily.</string>
     <string name="mcfx_description">Fix and import Minecraft packs, add-ons, and worlds.</string>
     <string name="mmkb_description">Back up, restore, and share your Minecraft content.</string>

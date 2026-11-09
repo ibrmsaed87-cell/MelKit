@@ -116,7 +116,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
         else {
             pending = action
             val permissions = if (Build.VERSION.SDK_INT >= 33) {
-                arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES, Manifest.permission.POST_NOTIFICATIONS)
+                arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
             } else arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
             networkPermissions.launch(permissions)
         }

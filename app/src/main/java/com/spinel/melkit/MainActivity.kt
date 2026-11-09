@@ -35,11 +35,12 @@ class MainActivity : AppCompatActivity() {
         setContent { MelKitTheme { MelKitApp(shareRequest) } }
         val notificationTap = savedInstanceState == null && NotificationNavigation.consume(this, intent)
         val preferences = getSharedPreferences("notifications", MODE_PRIVATE)
-        if (!notificationTap && Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
-            !preferences.getBoolean("permission_asked", false)) {
+        if (!notificationTap && Build.VERSION.SDK_INT >= 33 && !preferences.getBoolean("permission_asked", false)) {
+            // Record first normal launch even when permission was already granted.
             preferences.edit().putBoolean("permission_asked", true).apply()
-            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
     }
 
