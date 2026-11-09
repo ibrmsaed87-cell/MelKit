@@ -130,7 +130,7 @@
     <string name="coming_to_store">Coming to Google Play</string>
     <string name="mmix_name" translatable="false">MMIX</string>
     <string name="mcfx_name" translatable="false">MCFX</string>
-    <string name="mmkb_name" translatable="false">MMKB</string>
+    <string name="mmkb_name" translatable="false">MCBK</string>
     <string name="mmix_description">Import Melon Sandbox mods, maps, and files easily.</string>
     <string name="mcfx_description">Fix and import Minecraft packs, add-ons, and worlds.</string>
     <string name="mmkb_description">Back up, restore, and share your Minecraft content.</string>
