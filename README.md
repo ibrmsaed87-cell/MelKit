@@ -103,6 +103,8 @@
 - [x] إضافة الاستعادة الجماعية من حزمة مفتوحة: اختيار ملفات أو تحديد الكل، تأكيد واحد، واستعادة متسلسلة بآلية الملف الواحد الحالية. يظهر العدّاد أسفل الشاشة ونتيجة كل ملف، ويُتجاوز الموجود دون استبداله. يستمر العمل بعد فشل ملف منفرد، ويتوقف عند فقد الربط أو انشغال الخدمة أو الحاجة لاسترجاع المودات أو تعذر تأكيد اكتمال العملية. تظهر الملفات التي لم تبدأ منفصلة عن الفاشلة.
 - [x] زر إيقاف بعد الملف الجاري، مع الاحتفاظ بالاستعادات المكتملة وإبقاء المتعذر وغير المحاوَل محددًا لإعادة المحاولة. مغادرة القسم تطلب الإيقاف بين الملفات؛ لا تقاطع الكتابة الجارية. إذا تعذّر استلام نتيجة ملف بسبب إلغاء المهمة يُعرض أنها غير مؤكدة بدل الادعاء بنجاحها.
 - [x] نجح 317 فحص Java، منها 39 لخطة الاستعادة الجماعية وتكاملها مع الكاتب الحقيقي، وصحة XML وتطابق 368 ترجمة و367 مرجع نص. فُحصت صياغة الواجهة المعدلة؛ فحص الصياغة لا يقوم مقام مترجم Kotlin أو فحص Android. أذن المستخدم بضم هذه الميزة إلى التعديلات المؤجلة دون تشغيل بناء أو طلب اختبار هاتف جديد الآن.
+- [x] أُضيف فيديوَا شرح Shizuku الأصليان إلى موارد التطبيق في 9 نوفمبر 2026. بطاقة الدليل أعلى قسم الأدوات تفتح مشغّلًا داخليًا يختار الفيديو حسب لغة واجهة MelKit ويعمل من الملفات المضمّنة دون تنزيل. توجد أدوات تشغيل وتقديم، وحفظ للموضع عند الدوران، وإيقاف عند الخلفية، ورسالة خطأ مع إعادة المحاولة. يبقى اختصار الدليل في تنبيه الحاجة إلى Shizuku.
+- [x] تطابقت بصمتا الفيديوهين مع الأصل، ونجح فك الفيديو والصوت كاملين محليًا. نجح فحص صياغة ملفّي Kotlin المعدلين وXML و373 ترجمة و372 مرجع نص. لم يُشغّل Gradle أو بناء APK/AAB؛ تجربة المشغّل واختيار اللغة على Android مؤجلة للبناء المأذون. [التفاصيل](docs/SHIZUKU_VIDEO_VALIDATION.md).
 - [ ] بناء Android في GitLab بعد موافقة المستخدم، ثم مراجعة الواجهة الجديدة بالعربية والإنجليزية ومسار الملف المرقّم وفتح مجلده والتنبيه عند توقف Shizuku ومسح الجلسة عند مغادرتها. [التفاصيل وحدود التحقق](docs/VALIDATION_0_1_11.md).
 
 ### تجميع التعديلات
@@ -175,12 +177,13 @@
 
 ### بطاقة شرح Shizuku
 
-- نضيف بطاقة واضحة بعنوان **شرح إعداد Shizuku** داخل قسم الأدوات، على غرار دليل تطبيق Minecraft Backup الذي أشار إليه المستخدم باسم MMBK.
+- أُضيفت بطاقة واضحة بعنوان **شرح إعداد Shizuku** أعلى قسم الأدوات، على غرار دليل تطبيق Minecraft Backup الذي أشار إليه المستخدم باسم MMBK. يبدأ الدليل ببطاقة مشاهدة الفيديو ثم خطوات الإعداد النصية ورابط التنزيل الرسمي.
 - تعرض البطاقة فيديو عربيًا عندما تكون لغة MelKit عربية، وفيديو إنجليزيًا عند اختيار الإنجليزية، بتنسيق منسجم مع بقية الواجهة.
 - يوضح الشرح الإعداد لأول مرة: فتح Shizuku، إعداد التصحيح اللاسلكي والاقتران، إدخال رمز الاقتران في إشعار Shizuku، ثم بدء الخدمة ومنح MelKit الإذن.
 - يبدأ الفيديو بالتنويه إلى أن الإعداد والاقتران خطوات أول تشغيل؛ في الاستخدام المعتاد لاحقًا يكفي فتح Shizuku وبدء الخدمة، مع توضيح ما يلزم إن طلب النظام إعادة الاقتران.
 - تتضمن البطاقة رابط تنزيل Shizuku الرسمي. وتوفر رسالة «يجب تشغيل Shizuku أولًا» اختصارًا لفتح بطاقة الشرح.
-- معيار القبول: ظهور الفيديو المناسب للغة، وضوح الاقتران والإشعار، وإمكانية الوصول إلى الشرح من الأدوات ورسالة الحاجة إلى Shizuku. هذه ميزة مخططة ولم تُنفذ داخل التطبيق بعد.
+- الفيديوهان مضمنان في `res/raw` بحجم إجمالي 5,082,738 بايت. يختار المشغّل المورد العربي أو الإنجليزي صراحةً من لغة التطبيق، دون الاعتماد على لغة الهاتف أو مشغّل خارجي.
+- معيار القبول: ظهور الفيديو المناسب للغة، وضوح الاقتران والإشعار، وإمكانية الوصول إلى الشرح من الأدوات ورسالة الحاجة إلى Shizuku. اكتملت الإضافة وفحوص الملفات والمصادر على فرع العمل؛ لم تُبنَ أو تُختبر على Android بعد.
 
 ### تبويب المزيد من التطبيقات — أربع بطاقات بالضبط
 
@@ -294,7 +297,7 @@
 
 MelKit (`com.spinel.melkit`) is an Arabic/English Android content manager for Melon Sandbox. It manages existing user content: backup/restore, offline phone-to-phone transfer, exportable bundles, a searchable library, safe mod toggling, activation profiles, duplicate/empty-file checks, supported-format validation, reversible quarantine, local categories, thumbnail preparation, and an operation history.
 
-MMIX remains the general downloaded-file installer. A dedicated Shizuku guide card in Tools will show an Arabic or English video matching the app language, cover first-time pairing and subsequent starts, link to the official download, and be accessible from Shizuku-required messages. In-game category/name and thumbnail changes are experimental until the current formats are verified with real files. No FPS or universal crash-fix promises are made.
+MMIX remains the general downloaded-file installer. The deferred 0.1.11 branch now includes both original Shizuku tutorial videos, a guide card in Tools, an internal offline player that selects the app language, first-time and subsequent-start instructions, the official download, and access from Shizuku-required messages. Video integrity, full host decoding, translations, XML, and Kotlin syntax have been checked; Android compilation and playback remain pending the approved build. In-game category/name and thumbnail changes are experimental until the current formats are verified with real files. No FPS or universal crash-fix promises are made.
 
 GitHub is the source of truth and runs only a short sync workflow. GitLab builds signed release APKs. README must be the first committed file. A permanent signing key must be created once, saved before distribution, and reused for every install-over update. AdMob/UMP and Firebase/FCM with validated Play Store links are late release-preparation work.
 
@@ -307,4 +310,4 @@ GitHub is the source of truth and runs only a short sync workflow. GitLab builds
 
 ---
 
-آخر تحديث للخطة **8 نوفمبر 2026**. اكتملت جولة الهاتف الواحد وتأكد النقل الأساسي عبر QR بتجربة المستخدم. أُعدت تحسينات 0.1.11 على فرع العمل، مع بقاء بناء GitLab بانتظار موافقته. نجح 317 فحص مضيف؛ تجربة الواجهة الجديدة والاستعادة الجماعية واختبارات الهاتف الثاني الثلاثة مؤجلة حتى بناء يوافق عليه المستخدم.
+آخر تحديث للخطة **9 نوفمبر 2026**. اكتملت جولة الهاتف الواحد وتأكد النقل الأساسي عبر QR بتجربة المستخدم. أُعدت تحسينات 0.1.11 على فرع العمل وأُضيف الفيديوهان العربي والإنجليزي ومشغّلهما الداخلي. فحوص Java السابقة وعددها 317 موثقة لدفعة الاستعادة؛ اجتازت إضافة الفيديو فحص سلامة الملفين وفكهما كاملين وصياغة Kotlin وXML والترجمات. لم يُنشأ بناء جديد؛ تجربة الفيديو والواجهة والاستعادة الجماعية واختبارات الهاتف الثاني الثلاثة مؤجلة حتى بناء يوافق عليه المستخدم.

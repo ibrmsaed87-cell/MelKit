@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -90,6 +91,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spinel.melkit.BuildConfig
 import com.spinel.melkit.share.ShareViewModel
 import com.spinel.melkit.R
+import com.spinel.melkit.ShizukuVideoActivity
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.SavedCopiesViewModel
 import com.spinel.melkit.storage.ModVaultViewModel
@@ -401,7 +403,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
         }
     }
     if (selected == 0) {
-        ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.Info) { navigate("shizuku") }
+        ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.PlayCircle) { navigate("shizuku") }
         features.forEach { feature ->
             ToolCard(feature.title, feature.description, feature.icon,
                 planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories", "thumbnails", "history")) {
@@ -457,9 +459,21 @@ private fun PromoCard(title: Int, description: Int, url: String?, accent: Color)
 @Composable
 private fun ShizukuScreen() {
     val context = LocalContext.current
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Icon(Icons.Outlined.PlayCircle, null, tint = MelkitMint, modifier = Modifier.size(30.dp))
+                Text(stringResource(R.string.shizuku_video_title),
+                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            }
+            MutedText(R.string.shizuku_video_note)
+            FilledTonalButton(onClick = { context.startActivity(Intent(context, ShizukuVideoActivity::class.java)) }) {
+                Text(stringResource(R.string.shizuku_video_watch))
+            }
+        }
+    }
     ToolText(R.string.shizuku_first_title, R.string.shizuku_first_body)
     ToolText(R.string.shizuku_later_title, R.string.shizuku_later_body)
-    MutedText(R.string.shizuku_video_note)
     FilledTonalButton(onClick = { openExternal(context, "https://shizuku.rikka.app/download/") }) {
         Text(stringResource(R.string.official_download))
     }

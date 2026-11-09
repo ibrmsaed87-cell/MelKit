@@ -36,6 +36,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".ShizukuVideoActivity"
+            android:exported="false" />
         <service
             android:name=".share.MelKitShareService"
             android:exported="false"
