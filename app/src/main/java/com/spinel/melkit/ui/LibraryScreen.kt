@@ -11,8 +11,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,12 +35,16 @@ import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,15 +59,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
 import androidx.core.content.ContextCompat
@@ -244,6 +244,8 @@ private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, 
     onRead: () -> Unit, onExport: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
+    var showDetails by rememberSaveable(entry.path) { mutableStateOf(false) }
+    var showActions by rememberSaveable(entry.path) { mutableStateOf(false) }
     val preview by produceState<Bitmap?>(null, entry, connected, previewRevision, coverRevision) {
         value = if (onCover != null) covers.load(entry.path) else null
         if (value == null && connected) value = model.preview(entry, previewRevision)
@@ -266,52 +268,53 @@ private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, 
     }
     Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val bitmap = preview
-                Box(Modifier.size(if (entry.directory) 30.dp else 64.dp).clip(RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center) {
-                    if (bitmap != null) {
-                        Image(bitmap = bitmap.asImageBitmap(), filterQuality = FilterQuality.None,
-                            contentDescription = null, contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerHighest))
-                    } else {
-                        Icon(icon, null, tint = MelkitMint, modifier = Modifier.size(30.dp))
-                    }
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val title = label?.name.orEmpty().ifEmpty { entry.name }
-                    Text(title, fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.ContentOrLtr))
-                    if (title != entry.name) Text(entry.name,
-                        style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.ContentOrLtr),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(stringResource(type), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    label?.category?.takeIf { it.isNotEmpty() }?.let { Text(it, color = MelkitMint) }
-                }
-            }
-            if (!entry.directory) {
-                Text(Formatter.formatFileSize(context, entry.size), style = MaterialTheme.typography.bodyMedium)
-                if (entry.modified > 0) Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
+            val title = label?.name.orEmpty().ifEmpty { entry.name }
+            FileCardHeader(title, preview, icon, onDetails = { showDetails = true }, directory = entry.directory) {
+                if (title != entry.name) Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.ContentOrLtr),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (entry.directory) stringResource(type) else stringResource(R.string.file_type_size,
+                    stringResource(type), Formatter.formatFileSize(context, entry.size)),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (!entry.directory && entry.modified > 0) Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
                     .format(Date(entry.modified)), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                label?.category?.takeIf { it.isNotEmpty() }?.let {
+                    Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium, color = MelkitMint)
+                }
             }
             if (entry.directory) {
-                TextButton(onClick = onOpen, enabled = enabled) { Text(stringResource(R.string.library_open_folder)) }
+                TextButton(onClick = onOpen, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.library_open_folder))
+                }
             } else if (entry.regular) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onRead, enabled = enabled) { Text(stringResource(R.string.library_read_test)) }
-                    FilledTonalButton(onClick = onExport, enabled = enabled) { Text(stringResource(R.string.library_export)) }
-                }
-                if (onOrganize != null) TextButton(onClick = onOrganize, enabled = enabled) {
-                    Text(stringResource(R.string.organization_edit))
-                }
-                if (onCover != null) TextButton(onClick = onCover, enabled = enabled) {
-                    Text(stringResource(R.string.cover_edit))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = onExport, enabled = enabled,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.library_export), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Box {
+                        IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Outlined.MoreVert, stringResource(R.string.file_actions))
+                        }
+                        DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.file_details)) },
+                                onClick = { showActions = false; showDetails = true })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.library_read_test)) }, enabled = enabled,
+                                onClick = { showActions = false; onRead() })
+                            if (onOrganize != null) DropdownMenuItem(text = { Text(stringResource(R.string.organization_edit)) },
+                                enabled = enabled, onClick = { showActions = false; onOrganize() })
+                            if (onCover != null) DropdownMenuItem(text = { Text(stringResource(R.string.cover_edit)) },
+                                enabled = enabled, onClick = { showActions = false; onCover() })
+                        }
+                    }
                 }
             }
         }
     }
+    if (showDetails) FileNameDialog(entry.name, entry.path) { showDetails = false }
 }
 
 internal fun issueText(issue: LibraryIssue): Int = when (issue) {

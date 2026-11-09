@@ -35,6 +35,7 @@ data class SavedCopy(val uri: Uri, val name: String, val path: String, val bytes
 data class SavedCopiesState(
     val copies: List<SavedCopy> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val issue: String? = null, val request: SavedCopy? = null, val restored: String? = null, val revision: Int = 0,
+    val conflict: SavedCopy? = null,
 )
 
 class SavedCopiesViewModel(application: Application) : AndroidViewModel(application) {
@@ -115,7 +116,7 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
         return copies.sortedWith(compareByDescending<SavedCopy> { it.modified }.thenBy { it.name.lowercase(Locale.ROOT) })
     }
 
-    private fun open(copy: SavedCopy): ParcelFileDescriptor = if (copy.uri.scheme == "file") {
+    private fun openCopy(copy: SavedCopy): ParcelFileDescriptor = if (copy.uri.scheme == "file") {
         ParcelFileDescriptor.open(File(requireNotNull(copy.uri.path)), ParcelFileDescriptor.MODE_READ_ONLY)
     } else resolver.openFileDescriptor(copy.uri, "r") ?: throw IOException("Saved copy unavailable")
 
@@ -125,7 +126,7 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
             previews.get(key)?.let { return@withLock it.bitmap }
             val bitmap = withContext(Dispatchers.IO) {
                 try {
-                    ParcelFileDescriptor.AutoCloseInputStream(open(copy)).use { input ->
+                    ParcelFileDescriptor.AutoCloseInputStream(openCopy(copy)).use { input ->
                         PreviewBitmap.decode(GamePreviewReader.readStream(input, copy.extension))
                     }
                 } catch (cancelled: CancellationException) { throw cancelled
@@ -137,21 +138,25 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun requestRestore(copy: SavedCopy) {
-        if (!mutableState.value.busy && copy.restorable) mutableState.update { it.copy(request = copy, issue = null) }
+        if (!mutableState.value.busy && copy.restorable) mutableState.update {
+            it.copy(request = copy, conflict = null, restored = null, issue = null)
+        }
     }
     fun dismissRequest() { mutableState.update { it.copy(request = null) } }
     fun dismissResult() { mutableState.update { it.copy(restored = null) } }
+    fun dismissConflict() { mutableState.update { it.copy(conflict = null) } }
 
-    fun restore(library: GameLibraryViewModel) {
-        val copy = mutableState.value.request ?: return
+    fun restore(library: GameLibraryViewModel, asCopy: Boolean = false) {
+        val copy = (if (asCopy) mutableState.value.conflict else mutableState.value.request) ?: return
         if (mutableState.value.busy) return
-        mutableState.update { it.copy(request = null, busy = true, issue = null) }
+        mutableState.update { it.copy(request = null, conflict = null, restored = null, busy = true, issue = null) }
         viewModelScope.launch {
-            val result = library.restoreSaved(copy.path, copy.bytes) { open(copy) }
+            val result = library.restoreSavedResult(copy.path, copy.bytes, asCopy, openSource = { openCopy(copy) })
             mutableState.update { it.copy(busy = false,
-                restored = if (result == "ok") copy.path else null,
-                issue = if (result == "ok") null else result) }
-            if (result == "ok") library.connect()
+                restored = if (result.status == "ok") result.path else null,
+                conflict = if (result.status == "exists" && !asCopy) copy else null,
+                issue = if (result.status == "ok" || (result.status == "exists" && !asCopy)) null else result.status) }
+            if (result.status == "ok") library.connect()
         }
     }
     override fun onCleared() { previews.evictAll(); super.onCleared() }

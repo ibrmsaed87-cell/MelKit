@@ -30,7 +30,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
@@ -50,6 +49,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -67,6 +67,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -88,11 +89,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.spinel.melkit.BuildConfig
 import com.spinel.melkit.share.ShareViewModel
 import com.spinel.melkit.R
 import com.spinel.melkit.ShizukuVideoActivity
 import com.spinel.melkit.storage.GameLibraryViewModel
+import com.spinel.melkit.storage.GameLibraryState
 import com.spinel.melkit.storage.SavedCopiesViewModel
 import com.spinel.melkit.storage.ModVaultViewModel
 import com.spinel.melkit.storage.ModProfilesViewModel
@@ -101,6 +106,8 @@ import com.spinel.melkit.storage.FileScanViewModel
 import com.spinel.melkit.storage.LibraryOrganizationViewModel
 import com.spinel.melkit.storage.LibraryCoversViewModel
 import kotlinx.coroutines.flow.first
+import java.text.NumberFormat
+import java.util.Locale
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
 private data class Feature(val route: String, val title: Int, val description: Int, val icon: ImageVector)
@@ -240,7 +247,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (route) {
-                            "home" -> HomeScreen(navigate, libraryState.connected, profilesState, profilesModel, libraryModel)
+                            "home" -> HomeScreen(navigate, libraryState, profilesState, profilesModel, libraryModel)
                             "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
                             "settings" -> SettingsScreen()
                             "shizuku" -> ShizukuScreen()
@@ -284,8 +291,20 @@ fun MelKitApp(shareRequest: Int = 0) {
 }
 
 @Composable
-private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean, profiles: ModProfilesState,
+private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, profiles: ModProfilesState,
     profilesModel: ModProfilesViewModel, library: GameLibraryViewModel) {
+    val connected = state.connected
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(connected, state.busy, state.previewRevision) {
+        if (connected && !state.busy) library.refreshCounts()
+    }
+    DisposableEffect(lifecycleOwner, library) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) library.refreshCounts()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(connected) {
         if (connected) {
             val ready = library.state.first { !it.busy || !it.connected }
@@ -300,9 +319,16 @@ private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean, profiles:
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.your_library), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth()) {
-                LibraryStat(R.string.mods, Icons.Outlined.Inventory2)
-                LibraryStat(R.string.maps, Icons.Outlined.Map)
-                LibraryStat(R.string.saves, Icons.Outlined.Save)
+                LibraryStat(R.string.mods, Icons.Outlined.Inventory2, state.counts?.mods, state)
+                LibraryStat(R.string.maps, Icons.Outlined.Map, state.counts?.maps, state)
+                LibraryStat(R.string.saves, Icons.Outlined.Save, state.counts?.saves, state)
+            }
+            if (connected && state.countsIssue != null) {
+                Text(stringResource(R.string.library_counts_failed), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = library::refreshCounts, enabled = !state.busy && !state.countsLoading) {
+                    Text(stringResource(R.string.library_refresh))
+                }
             }
             MutedText(if (connected) R.string.library_connected else R.string.not_connected)
             FilledTonalButton(onClick = { navigate("library") }) {
@@ -344,10 +370,21 @@ private fun HomeScreen(navigate: (String) -> Unit, connected: Boolean, profiles:
 }
 
 @Composable
-private fun RowScope.LibraryStat(label: Int, icon: ImageVector) {
+private fun RowScope.LibraryStat(label: Int, icon: ImageVector, count: Int?, state: GameLibraryState) {
+    val context = LocalContext.current
+    val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Icon(icon, null, tint = MelkitMint, modifier = Modifier.size(28.dp))
-        Text(stringResource(R.string.empty_count), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+            when {
+                state.countsLoading -> CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                count != null -> Text(NumberFormat.getIntegerInstance(locale).format(count),
+                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                state.connected && state.countsIssue != null -> Text(stringResource(R.string.library_count_unavailable),
+                    style = MaterialTheme.typography.labelSmall)
+                else -> Text(stringResource(R.string.empty_count), style = MaterialTheme.typography.headlineMedium)
+            }
+        }
         MutedText(label)
     }
 }
@@ -474,7 +511,7 @@ private fun ShizukuScreen() {
     }
     ToolText(R.string.shizuku_first_title, R.string.shizuku_first_body)
     ToolText(R.string.shizuku_later_title, R.string.shizuku_later_body)
-    FilledTonalButton(onClick = { openExternal(context, "https://shizuku.rikka.app/download/") }) {
+    FilledTonalButton(onClick = { openExternal(context, "https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api") }) {
         Text(stringResource(R.string.official_download))
     }
 }

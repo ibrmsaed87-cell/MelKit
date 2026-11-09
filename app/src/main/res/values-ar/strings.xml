@@ -183,7 +183,14 @@
     <string name="saved_confirm_title">استعادة هذا الملف؟</string>
     <string name="saved_confirm_body">أغلق Melon Sandbox أولًا. ستبقى النسخة المحفوظة في التنزيلات. إذا وُجد ملف بالاسم نفسه داخل اللعبة فسيبقى دون تغيير.</string>
     <string name="saved_cancel">إلغاء</string>
-    <string name="saved_exists">يوجد ملف بهذا الاسم داخل اللعبة وقد بقي دون تغيير. اختر نسخة محفوظة باسم مختلف.</string>
+    <string name="saved_exists">يوجد ملف بهذا الاسم داخل اللعبة وقد بقي دون تغيير. يمكنك استعادة نسخة جديدة باسم مرقّم للاحتفاظ بالملفين.</string>
+    <string name="saved_exists_title">الاحتفاظ بالملفين؟</string>
+    <string name="saved_restore_copy">استعادة كنسخة جديدة</string>
+    <string name="library_counts_failed">تعذرت قراءة أعداد الملفات. حاول تحديثها.</string>
+    <string name="library_count_unavailable">غير متاح</string>
+    <string name="file_actions">إجراءات الملف</string>
+    <string name="file_details">تفاصيل الملف</string>
+    <string name="file_type_size">%1$s · %2$s</string>
     <string name="saved_restore_error">تعذر إكمال الاستعادة والتحقق منها. النسخة المحفوظة لم تتغير.</string>
     <string name="saved_partial">لم تكتمل الاستعادة وتعذر إزالة ملفها الجديد. راجع مكان الاستعادة قبل المحاولة مجددًا. النسخة المحفوظة لم تتغير.</string>
     <string name="saved_restored">تمت استعادة الملف والتحقق منه</string>
