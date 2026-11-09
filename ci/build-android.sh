@@ -68,6 +68,8 @@ fi
 # The Android module uses the signing/version environment variables above.
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$CI_PROJECT_DIR/.gradle}"
 bash ci/check-content-paths.sh
+bash ci/prepare-firebase.sh
+unset GOOGLE_SERVICES_JSON_BASE64
 bash ci/check-firebase.sh
 source ci/setup-android.sh
 
@@ -105,3 +107,4 @@ for melkit_apk in "${melkit_apks[@]}"; do
   fi
   sha256sum "$melkit_apk" >> build/reports/melkit-build.txt
 done
+

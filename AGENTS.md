@@ -22,6 +22,10 @@ acceptance criteria, and progress record. Update it when a phase or decision cha
   MELKIT_SIGNING_BUNDLE is the preferred single CI secret. The public fingerprint
   in docs/signing-certificate.sha256 must match the key and every release APK.
 - Never commit credentials or signing keys, expose them in logs, or put them in artifacts.
+- Keep `app/google-services.json` untracked. Restore it from the
+  `GOOGLE_SERVICES_JSON_BASE64` CI secret with `ci/prepare-firebase.sh` before
+  Firebase validation or Android builds; never restore the old Git exception.
 - Add AdMob/UMP and Firebase/FCM during the late release-preparation phase.
 - Do not claim a feature, build, phone test, remote repository, or secret setup is done
   without direct evidence. Keep planned work visibly separate from completed work.
+

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-melkit_firebase_file="app/google-services.json"
+melkit_firebase_file="${1:-app/google-services.json}"
 if [[ ! -s "$melkit_firebase_file" ]]; then
   printf '%s\n' 'Missing the approved MelKit Firebase Android client configuration.' >&2
   exit 1
@@ -15,3 +15,4 @@ if grep -Eq '"private_key"|"type"[[:space:]]*:[[:space:]]*"service_account"' "$m
 fi
 # The Google Services Gradle task also parses JSON and matches the application ID.
 printf '%s\n' 'MelKit Firebase client configuration is present.'
+

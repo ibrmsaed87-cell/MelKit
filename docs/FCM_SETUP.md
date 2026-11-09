@@ -3,11 +3,16 @@
 ## Configuration and scope
 
 - Package: `com.spinel.melkit`; Firebase project: `scangpapp`.
-- The user supplied `google-services.json` and authorized its integration. Only
-  the matching MelKit Android client is included in `app/google-services.json`;
-  the other three app clients were omitted. The SDK app ID, project info and
-  client API configuration are unchanged for MelKit. This is Android client
-  configuration, not a service-account key or server credential.
+- The user supplied `google-services.json` and authorized its integration.
+  The configuration is no longer tracked in Git. The user reported adding its
+  Base64 content as `GOOGLE_SERVICES_JSON_BASE64` in GitHub Actions secrets and
+  GitLab CI/CD variables. GitHub retains a backup; Android builds run only in
+  GitLab. `ci/prepare-firebase.sh` restores `app/google-services.json` from that
+  variable in each validation/build job, checks for the MelKit Android client,
+  and rejects server credentials before replacing any local configuration.
+  A configuration containing other Android clients is accepted; Google Services
+  selects `com.spinel.melkit`. Its SDK app ID, project info and client API
+  configuration remain unchanged. Base64 is encoding, not encryption.
 - Google Services plugin `4.5.0`, Firebase BoM `35.1.0`, `firebase-messaging`.
   No Analytics, AdMob or server/admin dependency was added.
 - Topic and notification channel: `melkit_updates`. This topic is specific to
@@ -53,9 +58,17 @@ test push has been sent by this implementation task.
 
 ## Verification and phone test
 
+- Secret migration checks on 9 November 2026 passed: the user's Base64 decodes
+  byte-for-byte to the supplied file and preserves the existing MelKit client
+  and Firebase project. The preparation script creates a mode-0600 file, rejects
+  missing/empty/invalid Base64, a different app and server credentials, preserves
+  an existing file on those failures, and does not print the secret. Bash syntax,
+  CI YAML, preparation order and Git ignore rules passed. Android compilation
+  and the values stored remotely have not been verified in a new pipeline;
+  no APK/AAB build was started for this migration.
 - **422 host checks passed**, including 53 Play Store URL/package validation
   cases and all 369 earlier checks.
-- Firebase JSON selects exactly one `com.spinel.melkit` client. XML parsed,
+- The initial tracked Firebase JSON selected exactly one MelKit client. XML parsed,
   386 translated keys and 382 Kotlin string references verified; six changed
   or added Kotlin files passed syntax parsing. CI shell scripts passed syntax
   and Firebase configuration checks.
@@ -87,3 +100,4 @@ reviewed for this correction; no extra APK build is part of this UI edit.
 - https://firebase.google.com/docs/cloud-messaging/android/get-started
 - https://developer.android.com/develop/ui/compose/notifications/notification-permission
 - https://firebase.google.com/docs/projects/api-keys
+

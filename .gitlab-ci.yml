@@ -4,6 +4,9 @@ stages:
 
 workflow:
   rules:
+    # Sync source-only changes without an Android build; manual pipelines remain available.
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_MESSAGE =~ /\[skip android\]/i'
+      when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
@@ -29,7 +32,10 @@ validate_foundation:
     - bash -n ci/build-android.sh
     - bash -n ci/setup-android.sh
     - bash -n ci/check-content-paths.sh
+    - bash -n ci/prepare-firebase.sh
     - bash -n ci/check-firebase.sh
+    - bash ci/prepare-firebase.sh
+    - unset GOOGLE_SERVICES_JSON_BASE64
     - bash ci/check-firebase.sh
     - test -s docs/signing-certificate.sha256
     - |
@@ -63,3 +69,4 @@ build_signed_apk:
       - app/build/outputs/bundle/release/*.aab
       - build/reports/melkit-build.txt
     expire_in: 7 days
+
