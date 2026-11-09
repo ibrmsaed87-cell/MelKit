@@ -541,7 +541,6 @@ private fun SettingsScreen() {
         }
     }
     ToolText(R.string.appearance, R.string.dark_theme)
-    NotificationSettings()
     Text(stringResource(R.string.version, BuildConfig.VERSION_NAME), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

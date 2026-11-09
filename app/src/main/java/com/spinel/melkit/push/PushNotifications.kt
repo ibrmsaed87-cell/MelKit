@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -45,13 +44,6 @@ object PushNotifications {
             PackageManager.PERMISSION_GRANTED) && NotificationManagerCompat.from(context).areNotificationsEnabled() &&
             (Build.VERSION.SDK_INT < 26 || context.getSystemService(NotificationManager::class.java)
                 .getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE)
-
-    fun openSettings(context: Context) {
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-        } else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
-        runCatching { context.startActivity(intent) }
-    }
 
     fun show(context: Context, message: RemoteMessage) {
         createChannel(context)

@@ -1,9 +1,6 @@
 <resources>
     <string name="notifications_channel">App updates</string>
     <string name="notifications_description">Receive MelKit news and app links. Tap a notification to open its app page on Google Play.</string>
-    <string name="notifications_enabled">Notifications are enabled</string>
-    <string name="notifications_disabled">Notifications are off</string>
-    <string name="notifications_manage">Manage notifications</string>
     <string name="notifications_fallback_body">See the latest updates and apps.</string>
     <string name="app_name" translatable="false">MelKit</string>
     <string name="language_arabic" translatable="false">العربية</string>

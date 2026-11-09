@@ -13,8 +13,11 @@
 - Topic and notification channel: `melkit_updates`. This topic is specific to
   MelKit even though the Firebase project hosts several apps.
 - `POST_NOTIFICATIONS` is requested once on normal first launch on Android 13+.
-  Refusal leaves the app usable. Settings show the permission/channel state and
-  link to Android notification settings without repeatedly prompting.
+  Refusal leaves the app usable. At the user's request, there is no in-app
+  notification settings card; the standard Android Allow/Don't allow prompt is
+  the only notification-permission UI. The first launch is recorded even when
+  permission was already granted, and sharing no longer asks for it again.
+  Users can later change their choice in Android's app notification settings.
 - The permanent signing key and application ID are unchanged. Version name is
   `0.1.12`; CI continues to assign the increasing version code.
 
@@ -66,6 +69,16 @@ test push has been sent by this implementation task.
 - Test the four previous UI/restore changes in the same APK. Check install-over
   with the original signing certificate. Force-stopping an Android app is a
   separate delivery limitation, not the normal closed-app scenario above.
+
+## Notification UI correction after phone review
+
+The user requested removing the notification card and using the first-launch
+system permission prompt. The card, its helper and three unused translations
+per language were removed. Registration, the OS channel, message display and
+validated Play-link navigation remain in place. The first-launch flag now also
+records an already-granted permission, and sharing requests network permission
+only. XML, translated keys, resource references and changed Kotlin syntax were
+reviewed for this correction; no extra APK build is part of this UI edit.
 
 ## Primary references
 
