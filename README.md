@@ -19,7 +19,9 @@
 
 ## الحالة الحالية
 
-**دفعة الاختبار 0.1.13 — 9 نوفمبر 2026:** أذن المستخدم بإكمال التصحيح ثم بناء APK واحد يجمع تعديلات مراجعة الهاتف. أُصلح اتجاه اسم الملف في تأكيد الاستعادة، وجُمعت إزالة بطاقة الإشعارات وطلب الإذن مرة واحدة عند أول فتح، وأيقونات التطبيقات الأصلية، وتصحيح اسم MCBK ورابطه المتوقع. يبقى البناء على GitLab وبالمفتاح الأصلي؛ نتيجة البناء وتجربة هذه الدفعة على الهاتف لم تُتحققا بعد. [تفاصيل الدفعة والفحص](docs/VALIDATION_0_1_13.md).
+**بطاقة MMIX ورقم الإصدار — دون بناء جديد:** طلب المستخدم تنفيذ بطاقة MMIX المقترحة قبل «مكتبتك» في الرئيسية ووضع رقم الإصدار في بطاقة مثل المظهر، ثم تأجيل البناء إلى ما بعد إضافة AdMob. نُفذ التعديلان بالعربية والإنجليزية؛ البطاقة وزرها يفتحان MMIX المثبت أو صفحته على Google Play، وتتحدث تسمية الزر عند العودة للتطبيق. تستخدم بطاقة الإصدار قالب بطاقة المظهر نفسه ورقم BuildConfig الفعلي. اجتاز فحص الصياغة وXML وتطابق 387 مفتاح ترجمة ومراجع الموارد. يُحفظ المصدر على فرع `codex/melkit-mmix-home-version-card-20261109` دون تغيير main أو تشغيل Gradle أو CI؛ لم تُضف إعلانات بعد. [تفاصيل السلوك والفحص القادم](docs/PROMO_APPS.md#home-companion-card-and-version-card--no-build).
+
+**دفعة الاختبار 0.1.13 — 9 نوفمبر 2026:** أكد المستخدم تثبيت آخر بناء، وتظهر صورة الإعدادات 0.1.13 واختفاء بطاقة الإشعارات. تتضمن الدفعة تصحيح اتجاه اسم الملف، وأيقونات التطبيقات الأصلية، واسم MCBK ورابطه المتوقع. لم تُؤكد بعد بقية اختبارات هذه الدفعة على الهاتف، ولا يتوفر سجل مهمة GitLab الخاصة نفسها. [تفاصيل الدفعة والفحص](docs/VALIDATION_0_1_13.md).
 
 **تعديل واجهة الإشعارات بعد مراجعة الهاتف:** طلب المستخدم إزالة بطاقة «تحديثات التطبيقات» والاكتفاء بسؤال النظام عند أول فتح. أُزيلت البطاقة، وبقي طلب الإذن مرة واحدة على Android 13 فأحدث مع تسجيل أول فتح حتى عند وجود الإذن مسبقًا. لا تطلب المشاركة إذن الإشعارات مرة أخرى. التعديل ضمن دفعة 0.1.13؛ استقبال FCM وفتح رابط المتجر عند الضغط مستمران في الكود.
 
@@ -318,7 +320,7 @@
 
 MelKit (`com.spinel.melkit`) is an Arabic/English Android content manager for Melon Sandbox. It manages existing user content: backup/restore, offline phone-to-phone transfer, exportable bundles, a searchable library, safe mod toggling, activation profiles, duplicate/empty-file checks, supported-format validation, reversible quarantine, local categories, thumbnail preparation, and an operation history.
 
-MMIX remains the general downloaded-file installer. Both original Shizuku tutorial videos and their language-aware internal player are included. On 9 November the user confirmed map/mod/save restoration and use in the game, Shizuku reconnection, and Arabic/English video playback in the corresponding UI languages. Four further changes are prepared on `codex/melkit-ui-review-20261109`: real dashboard totals, the supplied Shizuku Play link, compact file cards/actions, and a numbered-copy restore option for saved-file conflicts. All 369 host checks passed; Android compilation and phone review of these new changes remain deferred at the user's request. In-game category/name and thumbnail changes are experimental until the current formats are verified with real files. No FPS or universal crash-fix promises are made.
+MMIX remains the general downloaded-file installer. Both original Shizuku tutorial videos and their language-aware internal player are included. The user confirmed map/mod/save restoration and use in the game, Shizuku reconnection, Arabic/English tutorial playback, the compact file cards and numbered-copy restore. FCM receipt and a Play-link tap succeeded in 0.1.12. A settings screenshot now confirms 0.1.13 with no custom notification card. The next source-only work branch adds the visible MMIX companion card and the matching app-version card, with no new APK build until after AdMob integration. The MMIX action rechecks its launcher on every tap and foreground resume, prefers launching the installed app, and falls back to its exact Play listing. In-game category/name and thumbnail changes remain experimental until verified with real files.
 
 GitHub is the source of truth and runs only a short sync workflow. GitLab builds signed release APKs. README must be the first committed file. A permanent signing key must be created once, saved before distribution, and reused for every install-over update. AdMob/UMP and Firebase/FCM with validated Play Store links are late release-preparation work.
 
@@ -331,4 +333,4 @@ GitHub is the source of truth and runs only a short sync workflow. GitLab builds
 
 ---
 
-آخر تحديث للخطة **9 نوفمبر 2026**. أكد المستخدم استعادة الخريطة والمود والحفظ واستخدامها داخل اللعبة، وإعادة ربط Shizuku، وتشغيل فيديو كل لغة في الواجهة المناسبة. جُهزت الملاحظات الأربع الجديدة على فرع العمل واجتازت 369 فحص مضيف مع XML والترجمات وصياغة Kotlin. لم يُنشأ بناء جديد لهذه التعديلات؛ مراجعة أعداد الرئيسية وتنسيق البطاقات وخيار الاستعادة الجديد والاستعادة الجماعية واختبارات الهاتف الثاني الثلاثة تنتظر البناء المأذون.
+آخر تحديث للخطة **9 نوفمبر 2026**. أكد المستخدم تشغيل 0.1.13، وطلب تنفيذ بطاقة MMIX على الرئيسية وبطاقة رقم الإصدار دون بناء جديد استعدادًا لإضافة AdMob. جُهز التعديلان على فرع العمل واجتازا فحوص الصياغة والموارد والترجمة؛ لا يُدّعى اختبارهما على الهاتف قبل بناء الدفعة القادمة.

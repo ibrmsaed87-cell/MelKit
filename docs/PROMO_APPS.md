@@ -2,8 +2,11 @@
 
 The user confirmed that the FCM notification arrived and opened its link, then
 requested real app icons and the anticipated MCBK Play URL. These changes are
-queued with removal of the notification settings card on
-`codex/melkit-phone-review-20261109`; no new build was requested for this edit.
+first queued with removal of the notification settings card on
+`codex/melkit-phone-review-20261109`, then included in the 0.1.13 snapshot on
+main (`2936c667ca602a387395fc0b79f9954f158b1a6d`). The user's settings
+screenshot confirms that 0.1.13 runs and the notification card is gone; the
+promo icons themselves have not yet been confirmed on the phone.
 
 | Card | Destination | Embedded icon source |
 | --- | --- | --- |
@@ -25,3 +28,43 @@ image fetcher, cache, permission or network dependency was introduced.
 The source images were visually inspected and their decoded formats/dimensions
 checked. XML/resource references, translations, and changed Kotlin syntax were
 checked. Android layout and taps need phone verification after the next build.
+
+## Home companion card and version card — no build
+
+The user approved the proposed MMIX card above **Your library** and requested
+implementation together with a version card matching Appearance. They explicitly
+deferred the next build until after AdMob is added. These edits are saved on
+`codex/melkit-mmix-home-version-card-20261109`; main and the installed APK remain
+unchanged for this step. Version and signing configuration are unchanged.
+
+- The home card uses the embedded original MMIX icon, a localized explanation,
+  mint outline and an adaptive label: **Open MMIX** / **Download MMIX**.
+- Both the card and its button use the same action. The app checks for a launcher
+  for `com.spinel.mmix` on entry, on foreground resume and again on tap. An
+  installed, launchable MMIX opens directly. If unavailable or launching fails,
+  the exact URL `https://play.google.com/store/apps/details?id=com.spinel.mmix`
+  opens in Google Play, with a browser fallback if Play cannot handle it. If no
+  handler exists, the existing localized link error is shown.
+- The manifest queries this one additional package. It does not request
+  `QUERY_ALL_PACKAGES`, enumerate installed apps, fetch icons or introduce an SDK.
+- The existing More Apps tab retains its four cards and store actions.
+- Settings now uses the same `ToolText` Surface, corner radius, spacing and colors
+  for Appearance and App version, with `BuildConfig.VERSION_NAME` as its value.
+- The home card has no fixed height or truncated copy; it follows RTL/LTR and
+  the dashboard scrolls within its existing fixed navigation.
+
+Validation completed without Gradle or an APK/AAB build: changed Kotlin syntax,
+nine XML files, 387 matching translation keys/placeholders, 382 app string
+references and drawable references. The manifest and unchanged version were
+checked, and `git diff --check` passed. No new tests were added for this small
+UI/navigation change, and no Android execution is claimed.
+
+After the combined AdMob build, verify both languages, the version-card layout,
+the whole-card and button actions with MMIX installed and absent, and the label
+refresh after returning from a store installation. Also check the browser
+fallback on a device without Play, if available. Do not remove MelKit to test.
+
+Android implementation references:
+
+- [Targeted package visibility](https://developer.android.com/training/package-visibility/declaring)
+- [PackageManager launcher contract](https://developer.android.com/reference/android/content/pm/PackageManager#getLaunchIntentForPackage(java.lang.String))

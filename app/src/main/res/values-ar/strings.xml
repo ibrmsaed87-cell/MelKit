@@ -121,10 +121,14 @@
     <string name="language_description">اختر العربية أو الإنجليزية. يتبع اتجاه الواجهة اللغة المختارة.</string>
     <string name="appearance">المظهر</string>
     <string name="dark_theme">الثيم الداكن</string>
-    <string name="version">الإصدار %1$s</string>
+    <string name="version">إصدار التطبيق</string>
     <string name="open_store">فتح في Google Play</string>
     <string name="coming_to_store">قريبًا على Google Play</string>
     <string name="mmix_description">استورد مودات وخرائط وملفات لعبة Melon Sandbox بسهولة.</string>
+    <string name="home_mmix_title">أضف مودات وخرائط</string>
+    <string name="home_mmix_description">استوردها عبر MMIX ثم نظّمها هنا.</string>
+    <string name="home_mmix_open">فتح MMIX</string>
+    <string name="home_mmix_download">تنزيل MMIX</string>
     <string name="mcfx_description">أصلح واستورد حزم Minecraft والمودات والعوالم.</string>
     <string name="mmkb_description">انسخ محتوى Minecraft احتياطيًا واستعده وشاركه.</string>
     <string name="developer_description">اكتشف المزيد من أدوات الألعاب من Spinel.</string>

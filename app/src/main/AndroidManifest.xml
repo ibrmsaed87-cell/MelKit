@@ -19,6 +19,7 @@
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
         <package android:name="com.studio27.MelonPlayground" />
+        <package android:name="com.spinel.mmix" />
     </queries>
     <application
         android:allowBackup="false"
