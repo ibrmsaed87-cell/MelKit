@@ -69,11 +69,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -96,6 +98,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.spinel.melkit.BuildConfig
+import com.spinel.melkit.ads.AdManager
+import com.spinel.melkit.share.MelKitShareService
+import android.app.Activity
+import android.content.ContextWrapper
 import com.spinel.melkit.share.ShareViewModel
 import com.spinel.melkit.R
 import com.spinel.melkit.ShizukuVideoActivity
@@ -114,6 +120,9 @@ import java.util.Locale
 
 private data class Destination(val route: String, val title: Int, val icon: ImageVector)
 private data class Feature(val route: String, val title: Int, val description: Int, val icon: ImageVector)
+
+private const val MMIX_PACKAGE = "com.spinel.mmix"
+private const val MMIX_STORE_URL = "https://play.google.com/store/apps/details?id=$MMIX_PACKAGE"
 
 private val destinations = listOf(
     Destination("home", R.string.home, Icons.Outlined.Home),
@@ -149,11 +158,21 @@ fun MelKitApp(shareRequest: Int = 0) {
     val scanState by scanModel.state.collectAsState()
     val shareModel: ShareViewModel = viewModel()
     val bundleModel: ShareViewModel = viewModel(key = "bundles")
+    val sharePage by shareModel.state.collectAsState()
+    val bundlePage by bundleModel.state.collectAsState()
+    val transfer by MelKitShareService.state.collectAsState()
     val organization: LibraryOrganizationViewModel = viewModel()
     val labels by organization.labels.collectAsState()
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
+    val ads = remember(context) { AdManager.get(context) }
+    SideEffect {
+        val working = libraryState.busy || savedState.busy || vaultState.busy || profilesState.busy ||
+            scanState.busy || sharePage.busy || bundlePage.busy || transfer.active
+        ads.updateHost(route, allowAppOpen = route == "home" && !working && libraryState.connectionNotice == null,
+            allowBreak = !transfer.active && libraryState.connectionNotice == null)
+    }
     LaunchedEffect(shareRequest) {
         if (shareRequest > 0) {
             parent = "share"
@@ -318,6 +337,7 @@ private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, prof
         Text(stringResource(R.string.dashboard), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         MutedText(R.string.tagline)
     }
+    MmixCompanionCard()
     Surface(shape = RoundedCornerShape(22.dp), color = MelkitSurface) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.your_library), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -368,6 +388,48 @@ private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, prof
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Outlined.Info, null, tint = MelkitMint)
             Text(stringResource(R.string.preview_notice), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun MmixCompanionCard() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var canOpen by remember(context) { mutableStateOf(mmixLaunchIntent(context) != null) }
+    DisposableEffect(lifecycleOwner, context) {
+        canOpen = mmixLaunchIntent(context) != null
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) canOpen = mmixLaunchIntent(context) != null
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val openMmix: () -> Unit = {
+        // Recheck on tap in case the installed app changed since the last resume.
+        openMmixOrStore(context)
+        canOpen = mmixLaunchIntent(context) != null
+    }
+    Card(onClick = openMmix, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MelkitSurface),
+        border = BorderStroke(1.dp, MelkitMint.copy(alpha = 0.6f))) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Image(painterResource(R.drawable.promo_mmix), contentDescription = null,
+                    contentScale = ContentScale.Fit, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)))
+                Text(stringResource(R.string.mmix_name), style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.home_mmix_title), style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.home_mmix_description), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FilledTonalButton(onClick = openMmix) {
+                    Text(stringResource(if (canOpen) R.string.home_mmix_open else R.string.home_mmix_download))
+                }
+            }
         }
     }
 }
@@ -473,7 +535,7 @@ private fun ToolCard(title: Int, description: Int, icon: ImageVector, planned: B
 
 @Composable
 private fun MoreAppsScreen() {
-    PromoCard(R.string.mmix_name, R.string.mmix_description, "https://play.google.com/store/apps/details?id=com.spinel.mmix",
+    PromoCard(R.string.mmix_name, R.string.mmix_description, MMIX_STORE_URL,
         MelkitMint, R.drawable.promo_mmix)
     PromoCard(R.string.mcfx_name, R.string.mcfx_description, "https://play.google.com/store/apps/details?id=com.spinel.mcpackfixer",
         Color(0xFF86CDFF), R.drawable.promo_mcfx)
@@ -549,15 +611,25 @@ private fun SettingsScreen() {
         }
     }
     ToolText(R.string.appearance, R.string.dark_theme)
-    Text(stringResource(R.string.version, BuildConfig.VERSION_NAME), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    ToolText(R.string.version, BuildConfig.VERSION_NAME)
+    val ads = remember(context) { AdManager.get(context) }
+    val privacyRequired by ads.privacyRequired.collectAsState()
+    if (privacyRequired) {
+        TextButton(onClick = { context.activityOrNull()?.let(ads::showPrivacyOptions) }) {
+            Text(stringResource(R.string.ad_privacy_options))
+        }
+    }
 }
 
 @Composable
-private fun ToolText(title: Int, body: Int) {
+private fun ToolText(title: Int, body: Int) = ToolText(title, stringResource(body))
+
+@Composable
+private fun ToolText(title: Int, body: String) {
     Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionLabel(title)
-            MutedText(body)
+            Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -570,6 +642,37 @@ private fun SectionLabel(text: Int) {
 @Composable
 private fun MutedText(text: Int) {
     Text(stringResource(text), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+}
+
+private fun mmixLaunchIntent(context: Context): Intent? = try {
+    context.packageManager.getLaunchIntentForPackage(MMIX_PACKAGE)
+} catch (_: SecurityException) {
+    null
+}
+
+private fun openMmixOrStore(context: Context) {
+    val launch = mmixLaunchIntent(context)
+    if (launch != null && startCompanionActivity(context, launch)) return
+    val store = Intent(Intent.ACTION_VIEW, Uri.parse(MMIX_STORE_URL)).setPackage("com.android.vending")
+    if (startCompanionActivity(context, store)) return
+    if (!startCompanionActivity(context, Intent(Intent.ACTION_VIEW, Uri.parse(MMIX_STORE_URL)))) {
+        Toast.makeText(context, R.string.open_link_error, Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun startCompanionActivity(context: Context, intent: Intent): Boolean = try {
+    context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    true
+} catch (_: ActivityNotFoundException) {
+    false
+} catch (_: SecurityException) {
+    false
+}
+
+private tailrec fun Context.activityOrNull(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.activityOrNull()
+    else -> null
 }
 
 private fun openExternal(context: Context, url: String) {

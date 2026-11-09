@@ -14,7 +14,8 @@
   selects `com.spinel.melkit`. Its SDK app ID, project info and client API
   configuration remain unchanged. Base64 is encoding, not encryption.
 - Google Services plugin `4.5.0`, Firebase BoM `35.1.0`, `firebase-messaging`.
-  No Analytics, AdMob or server/admin dependency was added.
+  The initial FCM step added no Analytics, AdMob or server/admin dependency.
+  The later two-format AdMob integration is documented in [ADS_SETUP.md](ADS_SETUP.md).
 - Topic and notification channel: `melkit_updates`. This topic is specific to
   MelKit even though the Firebase project hosts several apps.
 - `POST_NOTIFICATIONS` is requested once on normal first launch on Android 13+.

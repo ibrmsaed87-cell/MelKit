@@ -19,6 +19,7 @@
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
         <package android:name="com.studio27.MelonPlayground" />
+        <package android:name="com.spinel.mmix" />
     </queries>
     <application
         android:allowBackup="false"
@@ -28,6 +29,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MelKit"
         android:usesCleartextTraffic="false">
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-9118481973136364~9451461448" />
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"

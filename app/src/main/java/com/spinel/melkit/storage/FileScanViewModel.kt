@@ -59,7 +59,7 @@ class FileScanViewModel : ViewModel() {
         }
     }
 
-    private fun updateScan(response: JSONObject) {
+    private fun parseScan(response: JSONObject): ScanPage {
         checked(response)
         val entries = response.getJSONArray("entries")
         val rows = List(entries.length()) { index ->
@@ -67,14 +67,16 @@ class FileScanViewModel : ViewModel() {
             ScanFinding(item.getInt("index"), item.getString("path"), item.getString("issue"),
                 item.getString("reference"), item.getLong("size"), item.getBoolean("selectable"), item.getBoolean("retained"))
         }
-        val page = ScanPage(response.getString("token"), response.getInt("files"), response.getInt("total"),
+        return ScanPage(response.getString("token"), response.getInt("files"), response.getInt("total"),
             response.getBoolean("partial"), response.getInt("offset"), response.getBoolean("next"), rows)
-        mutableState.update { it.copy(scan = page) }
     }
+
+    private fun updateScan(response: JSONObject) { mutableState.update { it.copy(scan = parseScan(response)) } }
 
     fun start(library: GameLibraryViewModel) = run {
         mutableState.update { it.copy(scan = null, selection = emptySet(), request = null) }
-        updateScan(library.scanFiles("start"))
+        val page = parseScan(library.scanFiles("start"))
+        library.adBreak(com.spinel.melkit.ads.AdPlacement.SCAN) { mutableState.update { it.copy(scan = page) } }
     }
 
     fun scanPage(library: GameLibraryViewModel, offset: Int) {
@@ -144,5 +146,7 @@ class FileScanViewModel : ViewModel() {
         }
     }
 
-    companion object { const val PAGE_SIZE = 40 }
+    companion object {
+        const val PAGE_SIZE = 40
+    }
 }

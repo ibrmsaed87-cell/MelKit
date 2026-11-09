@@ -44,10 +44,15 @@ class ModProfilesViewModel : ViewModel() {
         if (mutableState.value.busy) return
         mutableState.update { it.copy(busy = true, issue = null, result = null) }
         viewModelScope.launch {
-            try { block() }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { mutableState.update { it.copy(issue = (error as? ProfileFailure)?.status ?: "incomplete") } }
-            finally { mutableState.update { it.copy(busy = false) } }
+            try {
+                block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                mutableState.update { it.copy(issue = (error as? ProfileFailure)?.status ?: "incomplete") }
+            } finally {
+                mutableState.update { it.copy(busy = false) }
+            }
         }
     }
     fun refresh(library: GameLibraryViewModel) = run { load(library) }
@@ -108,7 +113,9 @@ class ModProfilesViewModel : ViewModel() {
             // Read the journal even when switching fails so recovery controls become available.
             load(library)
             checked(response)
-            mutableState.update { it.copy(result = request.action) }
+            val publish = { mutableState.update { it.copy(result = request.action) } }
+            if (request.action == "apply") library.adBreak(com.spinel.melkit.ads.AdPlacement.PROFILE, publish)
+            else publish()
         }
     }
     private class ProfileFailure(val status: String) : Exception()

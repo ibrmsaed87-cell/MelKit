@@ -19,7 +19,11 @@
 
 ## الحالة الحالية
 
-**دفعة الاختبار 0.1.13 — 9 نوفمبر 2026:** أذن المستخدم بإكمال التصحيح ثم بناء APK واحد يجمع تعديلات مراجعة الهاتف. أُصلح اتجاه اسم الملف في تأكيد الاستعادة، وجُمعت إزالة بطاقة الإشعارات وطلب الإذن مرة واحدة عند أول فتح، وأيقونات التطبيقات الأصلية، وتصحيح اسم MCBK ورابطه المتوقع. يبقى البناء على GitLab وبالمفتاح الأصلي؛ نتيجة البناء وتجربة هذه الدفعة على الهاتف لم تُتحققا بعد. [تفاصيل الدفعة والفحص](docs/VALIDATION_0_1_13.md).
+**دمج AdMob وUMP — مصدر 0.1.14 دون بناء جديد:** وافق المستخدم على البيني وفتح التطبيق فقط، وعلى الاستراتيجية المدروسة وحدود 90 ثانية و3 بينيات/10 دقائق وإعلان فتح واحد/10 دقائق. جُلبت المعرفات من رسالة AdMob الأخيرة في Gmail، ودُمجت حزمة الإعلانات وUMP مع الفرص بعد المهام الناجحة، واستثناء النقل والعودة من التطبيقات الخارجية والإشعارات، ومعالجة الخصوصية بحسب متطلبات UMP. الإعلانات التجريبية هي الافتراضية حتى للبناء الموقّع؛ التشغيل الحي يحتاج `MELKIT_LIVE_ADS=true` عند بناء النشر. جُمعت بطاقتا MMIX والإصدار مع آخر تعديل لاسترجاع Firebase من الأسرار. نجح 456 فحص مضيف، منها 34 لقواعد الإعلانات. لم يُشغّل Gradle أو بناء جديد ولم تُنشر رسالة موافقة في لوحة AdMob؛ إعداد استهداف EEA وبريطانيا وسويسرا ونشر الرسالة متبقيان. [السلوك والمعرفات والإعداد والفحص](docs/ADS_SETUP.md).
+
+**بطاقة MMIX ورقم الإصدار — دون بناء جديد:** نُفذ التعديلان بالعربية والإنجليزية على فرع البطاقات ثم ضُمّا إلى فرع `codex/melkit-admob-ump-20261109`. تقع بطاقة MMIX قبل «مكتبتك»، وتفتح التطبيق المثبت أو صفحته على Google Play، وتتحدث تسمية الزر عند العودة. تستخدم بطاقة الإصدار قالب المظهر نفسه ورقم BuildConfig الفعلي. لم يُشغّل بناء جديد لهما، وتجربة الهاتف تنتظر الدفعة المجمعة. [تفاصيل السلوك والفحص القادم](docs/PROMO_APPS.md#home-companion-card-and-version-card--no-build).
+
+**دفعة الاختبار 0.1.13 — 9 نوفمبر 2026:** أكد المستخدم تثبيت آخر بناء، وتظهر صورة الإعدادات 0.1.13 واختفاء بطاقة الإشعارات. تتضمن الدفعة تصحيح اتجاه اسم الملف، وأيقونات التطبيقات الأصلية، واسم MCBK ورابطه المتوقع. لم تُؤكد بعد بقية اختبارات هذه الدفعة على الهاتف، ولا يتوفر سجل مهمة GitLab الخاصة نفسها. [تفاصيل الدفعة والفحص](docs/VALIDATION_0_1_13.md).
 
 **تعديل واجهة الإشعارات بعد مراجعة الهاتف:** طلب المستخدم إزالة بطاقة «تحديثات التطبيقات» والاكتفاء بسؤال النظام عند أول فتح. أُزيلت البطاقة، وبقي طلب الإذن مرة واحدة على Android 13 فأحدث مع تسجيل أول فتح حتى عند وجود الإذن مسبقًا. لا تطلب المشاركة إذن الإشعارات مرة أخرى. التعديل ضمن دفعة 0.1.13؛ استقبال FCM وفتح رابط المتجر عند الضغط مستمران في الكود.
 
@@ -292,7 +296,7 @@
 
 ### AdMob
 
-يضاف SDK والمعرفات وموافقة UMP قبل الإصدار النهائي بعد استقرار الوظائف. نستخدم معرفات الاختبار أثناء التطوير ونحدد أنواع الإعلانات ومواضعها مع المستخدم في تلك المرحلة. لا نضع إعلانًا يقطع نسخ الملفات أو التحقق أو النقل أو التراجع.
+دُمج Google Mobile Ads 25.5.0 وUMP 4.0.0 للبيني وفتح التطبيق فقط وفق موافقة المستخدم في 9 نوفمبر 2026. الفرص مرتبطة بانتهاء مهام ناجحة؛ لا تُعرض أثناء نسخ الملفات أو التحقق أو النقل أو التراجع، ولا عند كل تبويب. يُحمّل الإعلان مسبقًا وتُعرض النتيجة مباشرة عند غيابه. تستخدم جميع أنواع البناء وحدات الاختبار افتراضيًا؛ التشغيل الحي يحتاج متغير بناء صريح. لا يُفترض اكتمال الإعداد على لوحة AdMob أو اختبار الهاتف قبل دليل منفصل. [تفاصيل الدمج والحدود والفحص](docs/ADS_SETUP.md).
 
 ### Firebase والإشعارات
 
@@ -319,7 +323,7 @@
 
 MelKit (`com.spinel.melkit`) is an Arabic/English Android content manager for Melon Sandbox. It manages existing user content: backup/restore, offline phone-to-phone transfer, exportable bundles, a searchable library, safe mod toggling, activation profiles, duplicate/empty-file checks, supported-format validation, reversible quarantine, local categories, thumbnail preparation, and an operation history.
 
-MMIX remains the general downloaded-file installer. Both original Shizuku tutorial videos and their language-aware internal player are included. On 9 November the user confirmed map/mod/save restoration and use in the game, Shizuku reconnection, and Arabic/English video playback in the corresponding UI languages. Four further changes are prepared on `codex/melkit-ui-review-20261109`: real dashboard totals, the supplied Shizuku Play link, compact file cards/actions, and a numbered-copy restore option for saved-file conflicts. All 369 host checks passed; Android compilation and phone review of these new changes remain deferred at the user's request. In-game category/name and thumbnail changes are experimental until the current formats are verified with real files. No FPS or universal crash-fix promises are made.
+MMIX remains the general downloaded-file installer. Both original Shizuku tutorial videos and their language-aware internal player are included. The user confirmed map/mod/save restoration and use in the game, Shizuku reconnection, Arabic/English tutorial playback, the compact file cards and numbered-copy restore. FCM receipt and a Play-link tap succeeded in 0.1.12. A settings screenshot now confirms 0.1.13 with no custom notification card. The next source-only work branch adds the visible MMIX companion card and the matching app-version card, with no new APK build until after AdMob integration. The MMIX action rechecks its launcher on every tap and foreground resume, prefers launching the installed app, and falls back to its exact Play listing. In-game category/name and thumbnail changes remain experimental until verified with real files.
 
 GitHub is the source of truth and runs only a short sync workflow. GitLab builds signed release APKs. README must be the first committed file. A permanent signing key must be created once, saved before distribution, and reused for every install-over update. AdMob/UMP and Firebase/FCM with validated Play Store links are late release-preparation work.
 
@@ -332,5 +336,5 @@ GitHub is the source of truth and runs only a short sync workflow. GitLab builds
 
 ---
 
-آخر تحديث للخطة **9 نوفمبر 2026**. أكد المستخدم استعادة الخريطة والمود والحفظ واستخدامها داخل اللعبة، وإعادة ربط Shizuku، وتشغيل فيديو كل لغة في الواجهة المناسبة. جُهزت الملاحظات الأربع الجديدة على فرع العمل واجتازت 369 فحص مضيف مع XML والترجمات وصياغة Kotlin. لم يُنشأ بناء جديد لهذه التعديلات؛ مراجعة أعداد الرئيسية وتنسيق البطاقات وخيار الاستعادة الجديد والاستعادة الجماعية واختبارات الهاتف الثاني الثلاثة تنتظر البناء المأذون.
+آخر تحديث للخطة **9 نوفمبر 2026**. أكد المستخدم تشغيل 0.1.13، وطلب تنفيذ بطاقة MMIX على الرئيسية وبطاقة رقم الإصدار دون بناء جديد استعدادًا لإضافة AdMob. جُهز التعديلان على فرع العمل واجتازا فحوص الصياغة والموارد والترجمة؛ لا يُدّعى اختبارهما على الهاتف قبل بناء الدفعة القادمة.
 

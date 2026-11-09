@@ -19,26 +19,39 @@ import com.spinel.melkit.ui.MelKitApp
 import com.spinel.melkit.ui.MelKitTheme
 import com.spinel.melkit.push.NotificationNavigation
 import com.spinel.melkit.push.PushNotifications
+import com.spinel.melkit.ads.AdManager
+import androidx.lifecycle.Lifecycle
 
 class MainActivity : AppCompatActivity() {
+    private val ads by lazy { AdManager.get(this) }
     private var shareRequest by mutableIntStateOf(0)
-    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private var notificationPermissionPending = false
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        notificationPermissionPending = false
+        // Resume consent work, but never create a delayed app-open opportunity.
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) ads.onResume(this, false)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ads.onCreate(this)
         PushNotifications.register(this)
-        if (intent?.action == MelKitShareService.OPEN) shareRequest++
+        if (intent?.action == MelKitShareService.OPEN) { shareRequest++; ads.suppressExternalReturn() }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(0xFF101513.toInt()),
             navigationBarStyle = SystemBarStyle.dark(0xFF101513.toInt()),
         )
         setContent { MelKitTheme { MelKitApp(shareRequest) } }
+        val fromNotification = intent.action == PushNotifications.OPEN || intent.hasExtra("google.message_id") || intent.hasExtra("gcm.message_id")
+        if (fromNotification) ads.suppressExternalReturn()
         val notificationTap = savedInstanceState == null && NotificationNavigation.consume(this, intent)
         val preferences = getSharedPreferences("notifications", MODE_PRIVATE)
         if (!notificationTap && Build.VERSION.SDK_INT >= 33 && !preferences.getBoolean("permission_asked", false)) {
             // Record first normal launch even when permission was already granted.
             preferences.edit().putBoolean("permission_asked", true).apply()
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionPending = true
+                ads.suppressExternalReturn()
                 notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -47,8 +60,31 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.action == MelKitShareService.OPEN) shareRequest++
+        if (intent.action == MelKitShareService.OPEN) { shareRequest++; ads.suppressExternalReturn() }
+        if (intent.action == PushNotifications.OPEN || intent.hasExtra("google.message_id") || intent.hasExtra("gcm.message_id")) {
+            ads.suppressExternalReturn()
+        }
         NotificationNavigation.consume(this, intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ads.onResume(this, notificationPermissionPending)
+    }
+
+    override fun onPause() { ads.onPause(this); super.onPause() }
+    override fun onStop() { ads.onStop(this, isChangingConfigurations); super.onStop() }
+    override fun onDestroy() { ads.onDestroy(this); super.onDestroy() }
+
+    override fun startActivity(intent: Intent, options: Bundle?) {
+        ads.suppressExternalReturn()
+        super.startActivity(intent, options)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        ads.suppressExternalReturn()
+        super.startActivityForResult(intent, requestCode, options)
     }
 }
 

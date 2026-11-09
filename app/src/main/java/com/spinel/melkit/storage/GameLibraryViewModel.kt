@@ -81,6 +81,9 @@ data class GameLibraryState(
 
 /** Owns Shizuku listeners and transfers across rotations; releases the process on exit. */
 class GameLibraryViewModel(application: Application) : AndroidViewModel(application) {
+    internal fun adBreak(placement: com.spinel.melkit.ads.AdPlacement, result: () -> Unit) {
+        com.spinel.melkit.ads.AdManager.get(getApplication<Application>()).afterTask(placement, result)
+    }
     private val mutableState = MutableStateFlow(GameLibraryState())
     val state = mutableState.asStateFlow()
     internal val journal = OperationJournal.get(application)
@@ -394,8 +397,8 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         operation = viewModelScope.launch {
             mutableState.update { it.copy(busy = true, issue = null, proof = null) }
             var destination: DownloadCopy? = null
-            try {
-                val proof = withContext(Dispatchers.IO) {
+            val proof = try {
+                withContext(Dispatchers.IO) {
                     checkUnchanged(service, entry)
                     val copy = DownloadCopy.create(getApplication<Application>(), entry.path)
                     destination = copy
@@ -418,8 +421,6 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                     val savedPath = copy.publish()
                     ReadProof(entry.name, copied.first, copied.second, true, savedPath)
                 }
-                mutableState.update { it.copy(busy = false, proof = proof) }
-                journal.add(OperationKind.COPY, proof.savedPath ?: entry.path)
             } catch (error: Exception) {
                 // Only remove this newly created Downloads copy, never a game file or older copy.
                 // Cleanup also runs after cancellation (for example, leaving the app).
@@ -429,6 +430,12 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
                 if (error is CancellationException) throw error
                 fail(if (!removed) LibraryIssue.PARTIAL_EXPORT else
                     (error as? AccessFailure)?.issue ?: LibraryIssue.EXPORT_FAILED)
+                return@launch
+            }
+            // The verified copy is committed; advertising cannot roll it back.
+            journal.add(OperationKind.COPY, proof.savedPath ?: entry.path)
+            adBreak(com.spinel.melkit.ads.AdPlacement.BACKUP) {
+                mutableState.update { it.copy(busy = false, proof = proof) }
             }
         }
     }

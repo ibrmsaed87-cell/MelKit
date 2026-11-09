@@ -13,6 +13,8 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.spinel.melkit.BuildConfig
+import com.spinel.melkit.ads.AdManager
+import com.spinel.melkit.ads.AdPlacement
 import com.spinel.melkit.storage.DownloadCopy
 import com.spinel.melkit.storage.CoverPhoto
 import com.spinel.melkit.storage.GameEntry
@@ -26,6 +28,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -63,9 +66,11 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         if (clearMessages) clearFeedback()
         mutableState.update { it.copy(busy = true) }
         viewModelScope.launch {
-            try { task() }
-            catch (error: CancellationException) { throw error }
-            catch (error: Exception) {
+            try {
+                task()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 issue(error.message?.takeIf { it.matches(Regex("[A-Z_]+")) } ?: "IO")
             } finally {
                 mutableState.update { it.copy(busy = false) }
@@ -115,7 +120,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
 
     fun toggleSaved(copy: SavedCopy) {
         if (selected(copy.path)) remove(copy.path)
-        else add(ShareInput(copy.path, copy.bytes.takeIf { it > 0 } ?: -1, open = { open(copy.uri) }))
+        else add(ShareInput(copy.path, copy.bytes.takeIf { it > 0 } ?: -1, open = { openSource(copy.uri) }))
     }
 
     fun selected(path: String) = mutableState.value.queue.any { ShareWire.pathKey(it.path) == ShareWire.pathKey(path) }
@@ -135,7 +140,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                         else -> return@use null
                     }
                     val bytes = if (cursor.isNull(1)) -1L else cursor.getLong(1)
-                    ShareInput("$folder/$name", bytes, open = { open(uri) })
+                    ShareInput("$folder/$name", bytes, open = { openSource(uri) })
                 }
             }
         }
@@ -143,7 +148,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         if (uris.size > ShareWire.MAX_FILES) issue("LIMIT")
     }
 
-    private fun open(uri: Uri) = if (uri.scheme == "file") File(requireNotNull(uri.path)).inputStream()
+    private fun openSource(uri: Uri) = if (uri.scheme == "file") File(requireNotNull(uri.path)).inputStream()
         else context.contentResolver.openInputStream(uri) ?: throw IOException("SOURCE_ACCESS")
 
     fun setBundleCover(cover: Bitmap?) {
@@ -168,7 +173,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                         val output = context.contentResolver.openOutputStream(destination, "w") ?: throw IOException("IO")
                         output.use { ContentBundle.copy(source, it, size, written) }
                     }
-                    val readBack = open(destination).use { ContentBundle.copy(it, null, size, verified) }
+                    val readBack = openSource(destination).use { ContentBundle.copy(it, null, size, verified) }
                     check(count == size && readBack == size && MessageDigest.isEqual(written.digest(), verified.digest())) { "CHECKSUM" }
                 }
             } catch (error: Exception) {
@@ -183,14 +188,16 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 }
             }.getOrNull()
         }
-        mutableState.update { it.copy(bundleUri = destination, bundleStatus = "saved", bundleName = name) }
+        AdManager.get(context).afterTask(AdPlacement.BUNDLE) {
+            mutableState.update { it.copy(bundleUri = destination, bundleStatus = "saved", bundleName = name) }
+        }
     }
 
     fun importBundle(uri: Uri) = run {
         mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet()) }
         val (batch, cover) = runInterruptible(Dispatchers.IO) {
             withBundleArchive { archive ->
-                open(uri).use { source ->
+                openSource(uri).use { source ->
                     archive.outputStream().use { ContentBundle.copy(source, it, ContentBundle.MAX_ARCHIVE, null) }
                 }
                 unpackBundle(archive)
@@ -251,7 +258,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 }
             } ?: ("" to -1L)
             val path = "Bundles/$name".takeIf(ShareWire::validBundlePath) ?: "Bundles/MelKit-Bundle.zip"
-            ShareInput(path, size.takeIf { it > 0 } ?: -1L, open = { open(uri) })
+            ShareInput(path, size.takeIf { it > 0 } ?: -1L, open = { openSource(uri) })
         }
         MelKitShareService.send(activity, listOf(input))
     }
@@ -288,7 +295,9 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         val status = library.restoreSaved(item.path, item.bytes) {
             ParcelFileDescriptor.open(item.file, ParcelFileDescriptor.MODE_READ_ONLY)
         }
-        if (status == "ok") mutableState.update { it.copy(imported = true) }
+        if (status == "ok") AdManager.get(context).afterTask(AdPlacement.RESTORE) {
+            mutableState.update { it.copy(imported = true) }
+        }
         else issue("RESTORE_" + status.uppercase(Locale.ROOT))
     }
 
@@ -341,7 +350,8 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                         ParcelFileDescriptor.open(item.file, ParcelFileDescriptor.MODE_READ_ONLY)
                     }
                     batch.complete(status)
-                    mutableState.update { it.copy(batchRestore = batch.snapshot()) }
+                    val progress = batch.snapshot()
+                    if (!progress.finished) mutableState.update { it.copy(batchRestore = progress) }
                 }
             } finally {
                 // Cancellation can arrive after the remote write finishes but before its
@@ -352,7 +362,11 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 val result = batch.snapshot()
                 val retry = result.entries.filter { it.outcome == BatchRestore.Outcome.FAILED ||
                     it.outcome == BatchRestore.Outcome.NOT_ATTEMPTED }.map { it.path }.toSet()
-                mutableState.update { it.copy(batchRestore = result, restoreSelection = retry) }
+                val publish = { mutableState.update { it.copy(batchRestore = result, restoreSelection = retry) } }
+                if (currentCoroutineContext().isActive && !result.stopRequested && result.restored == result.total) {
+                    // The complete batch is one opportunity, never one per restored file.
+                    AdManager.get(context).afterTask(AdPlacement.RESTORE, publish)
+                } else publish()
                 activeRestore = null
             }
         }
@@ -379,7 +393,9 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 throw error
             }
         }
-        mutableState.update { it.copy(saved = true, savedPath = path) }
+        AdManager.get(context).afterTask(AdPlacement.BACKUP) {
+            mutableState.update { it.copy(saved = true, savedPath = path) }
+        }
     }
 
     fun shareReceived(activity: Context, item: ReceivedFile) {
