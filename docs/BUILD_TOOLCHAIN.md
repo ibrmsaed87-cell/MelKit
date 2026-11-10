@@ -27,7 +27,12 @@ AdMob/UMP versions, app ID, namespace, SDK levels, original certificate check,
 Firebase secret restoration, ad placements, frequency limits and test-serving
 default are unchanged. The prepared retry also includes the reviewed picker
 fix: selecting files updates a count, while a separate scrollable dialog
-provides review/removal instead of pushing the source list down.
+provides review/removal instead of pushing the source list down. The subsequent
+notification feedback is also included: transfer percentage and file index/count
+are explicit localized content and expanded text, instead of relying on the
+system progress bar to print a number. Initial progress and phase transitions
+refresh the notification immediately; regular updates remain throttled to one
+per second. Cancellation and foreground-service lifetime are unchanged.
 
 ## Verification boundary
 

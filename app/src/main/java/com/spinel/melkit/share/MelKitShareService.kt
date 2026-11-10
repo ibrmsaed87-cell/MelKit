@@ -212,9 +212,12 @@ class MelKitShareService : Service() {
     }
 
     private fun publish(value: ShareTransfer) {
+        val previous = mutableState.value
+        val progressStarted = previous.progress == null && value.progress != null
+        val phaseChanged = previous.phase != value.phase
         mutableState.value = value
         val now = SystemClock.elapsedRealtime()
-        if (now - lastNotification >= 1000 && (Build.VERSION.SDK_INT < 33 ||
+        if ((progressStarted || phaseChanged || now - lastNotification >= 1000) && (Build.VERSION.SDK_INT < 33 ||
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED)) {
             runCatching { getSystemService(NotificationManager::class.java).notify(NOTIFICATION, notification(value)) }
             lastNotification = now
@@ -259,10 +262,14 @@ class MelKitShareService : Service() {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java)
             .setAction(OPEN).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP), flags)
         val cancel = PendingIntent.getService(this, 1, Intent(this, MelKitShareService::class.java).setAction(CANCEL), flags)
-        val percent = value.progress?.let { (it.bytes * 100 / it.total).toInt().coerceAtMost(99) } ?: 0
+        val progress = value.progress?.takeIf { it.total > 0L }
+        val percent = progress?.let { (it.bytes * 100 / it.total).toInt().coerceIn(0, 99) } ?: 0
+        val details = progress?.let { ctx.getString(R.string.share_progress, percent, it.index, it.count) }
+            ?: ctx.getString(phaseLabel(value.phase))
         return NotificationCompat.Builder(this, CHANNEL).setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle(ctx.getString(phaseLabel(value.phase))).setContentIntent(open).setOnlyAlertOnce(true)
-            .setOngoing(true).setProgress(100, percent, value.progress == null)
+            .setContentText(details).setStyle(NotificationCompat.BigTextStyle().bigText(details))
+            .setOngoing(true).setProgress(100, percent, progress == null)
             .addAction(0, ctx.getString(R.string.saved_cancel), cancel).build()
     }
 
