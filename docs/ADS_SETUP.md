@@ -30,8 +30,11 @@ On 10 November the user authorized one combined signed APK phone-test build
 through GitLab. Main integration at `c9e68428` and synchronization succeeded. The user
 provided the failed foundation log: Firebase preparation hit an unsupported
 BusyBox decoder option before Gradle. The decoder fix and 13 portable preparation
-cases are documented in `FCM_SETUP.md`; retry is being prepared. No successful
-Android build or produced APK has been observed. `BUILD_AAB` remains false,
+cases are documented in `FCM_SETUP.md`. The next user-supplied log for
+`063cb9cc` confirms Firebase preparation and signing checks succeeded, but
+Kotlin compilation rejected the ad SDK metadata. The aligned Kotlin/Compose
+2.3.10 and AGP 8.13.2 fix is documented in `BUILD_TOOLCHAIN.md` and includes
+the source-picker layout fix. No successful APK has yet been observed. `BUILD_AAB` remains false,
 and test ads remain the default. Source version is `0.1.14`; GitLab supplies its
 increasing version code. The package and original signing configuration remain
 unchanged.
