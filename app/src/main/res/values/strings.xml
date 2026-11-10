@@ -316,6 +316,7 @@
     <string name="share_from_game">Game files</string>
     <string name="share_choose_documents">Choose from phone storage</string>
     <string name="share_queue_count">Selected files %1$d</string>
+    <string name="share_review_selection">Review selection</string>
     <string name="share_create_qr">Next · Create QR</string>
     <string name="share_remove">Remove from selection</string>
     <string name="share_parent">Up one folder</string>

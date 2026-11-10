@@ -309,6 +309,7 @@
     <string name="share_from_game">ملفات اللعبة</string>
     <string name="share_choose_documents">اختيار من ذاكرة الهاتف</string>
     <string name="share_queue_count">الملفات المحددة %1$d</string>
+    <string name="share_review_selection">مراجعة المحدد</string>
     <string name="share_create_qr">التالي · إنشاء رمز QR</string>
     <string name="share_remove">إزالة من التحديد</string>
     <string name="share_parent">العودة إلى المجلد الأعلى</string>

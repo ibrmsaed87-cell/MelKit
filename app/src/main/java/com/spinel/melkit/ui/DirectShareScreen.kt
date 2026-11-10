@@ -172,6 +172,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
         pageState.batchRestore?.finished == false -> "contents"
         else -> page
     }
+    var reviewingSelection by remember(screen) { mutableStateOf(false) }
     val bundleFiles = if (screen == "contents") pageState.received.filter {
         it.batch == pageState.bundleBatch && ShareWire.validPath(it.path)
     } else emptyList()
@@ -311,7 +312,15 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                     }
                                 }
                                 ShareCard(null, null) {
-                                    Text(stringResource(R.string.share_queue_count, pageState.queue.size), fontWeight = FontWeight.Bold)
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(stringResource(R.string.share_queue_count, pageState.queue.size),
+                                            modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                                        TextButton(enabled = pageState.queue.isNotEmpty() && !pageState.busy,
+                                            onClick = { reviewingSelection = true }) {
+                                            Text(stringResource(R.string.share_review_selection))
+                                        }
+                                    }
                                     if (bundles) Row(verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                         pageState.draftCover?.let { CoverPreview(it, Modifier.size(64.dp)) }
@@ -339,19 +348,6 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                             != PackageManager.PERMISSION_GRANTED) readStorage.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
                                         else saved.refresh()
                                     }, text = { Text(stringResource(R.string.backups)) })
-                                }
-                            }
-                        }
-                        if (pageState.queue.isNotEmpty()) {
-                            items(pageState.queue, key = { "queue:" + it.path }) { file ->
-                                Surface(shape = RoundedCornerShape(12.dp), color = MelkitSurface) {
-                                    Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically) {
-                                        SharePath(file.path, Modifier.weight(1f))
-                                        IconButton(enabled = !pageState.busy, onClick = { model.remove(file.path) }) {
-                                            Icon(Icons.Outlined.Close, stringResource(R.string.share_remove))
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -568,6 +564,32 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
+    }
+    if (reviewingSelection && screen == "pick" && pageState.queue.isNotEmpty()) {
+        AlertDialog(onDismissRequest = { reviewingSelection = false },
+            title = { Text(stringResource(R.string.share_queue_count, pageState.queue.size)) },
+            text = {
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(pageState.queue, key = { "queue:" + it.path }) { file ->
+                        Surface(shape = RoundedCornerShape(12.dp), color = MelkitSurface) {
+                            Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                SharePath(file.path, Modifier.weight(1f))
+                                IconButton(enabled = !pageState.busy, onClick = {
+                                    if (pageState.queue.size == 1) reviewingSelection = false
+                                    model.remove(file.path)
+                                }) {
+                                    Icon(Icons.Outlined.Close, stringResource(R.string.share_remove))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { reviewingSelection = false }) { Text(stringResource(android.R.string.ok)) }
+            })
     }
     if (bundles && editingCover) {
         CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
