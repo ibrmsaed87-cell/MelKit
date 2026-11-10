@@ -34,6 +34,8 @@ validate_foundation:
     - bash -n ci/check-content-paths.sh
     - bash -n ci/prepare-firebase.sh
     - bash -n ci/check-firebase.sh
+    - bash -n ci/check-firebase-preparation.sh
+    - bash ci/check-firebase-preparation.sh
     - bash ci/prepare-firebase.sh
     - unset GOOGLE_SERVICES_JSON_BASE64
     - bash ci/check-firebase.sh

@@ -27,6 +27,31 @@
 - The permanent signing key and application ID are unchanged. Version name is
   `0.1.12`; CI continues to assign the increasing version code.
 
+## CI decoder fix — 10 November 2026
+
+The user supplied the failed `validate_foundation` log for source `c9e68428`.
+It stops in `ci/prepare-firebase.sh` before Gradle. The generic "not valid
+Base64" message also hid an unsupported decoder option: `base64 --decode`.
+Using BusyBox extracted from the exact official `bash:5.2` image digest
+`sha256:2cf7ddaf5f6369c16a0359e3bd48e54ada211a2e4e90d87532ad2958d642bdd5`,
+a valid synthetic Firebase client reproduces that same failure. The actual
+underlying error is `base64: unrecognized option: decode`.
+
+The helper now uses `base64 -d`, supports either a plain Base64 variable or
+GitLab's File-type variable containing Base64, and removes whitespace from
+wrapped/CRLF values. It checks the Base64 alphabet/padding length first, retains
+the MelKit-client/server-credential checks, never prints values, and replaces
+the target only after successful validation. Invalid input preserves an existing
+configuration and temporary files are cleaned up.
+
+`ci/check-firebase-preparation.sh` runs 13 synthetic cases, including missing,
+malformed and truncated values, File variables, wrong client and server-key
+rejection, preservation/replacement and temporary-file cleanup. All 13 passed
+with GNU base64 and again with the pinned image's BusyBox base64. The GitLab
+foundation job runs them before reading the real secret. No real secret was
+read, changed or printed by the local checks; no Firebase config is committed.
+A new GitLab build is required to establish Android compilation and APK output.
+
 ## Link payload
 
 Use custom data key **`url`** with an app-detail URL, for example:

@@ -27,8 +27,11 @@ The build report records `Live AdMob units: true/false` so a phone-test artifact
 and a production artifact can be distinguished before distribution.
 
 On 10 November the user authorized one combined signed APK phone-test build
-through GitLab. Main integration and synchronization are being prepared; there
-is no observed pipeline result or produced APK yet. `BUILD_AAB` remains false,
+through GitLab. Main integration at `c9e68428` and synchronization succeeded. The user
+provided the failed foundation log: Firebase preparation hit an unsupported
+BusyBox decoder option before Gradle. The decoder fix and 13 portable preparation
+cases are documented in `FCM_SETUP.md`; retry is being prepared. No successful
+Android build or produced APK has been observed. `BUILD_AAB` remains false,
 and test ads remain the default. Source version is `0.1.14`; GitLab supplies its
 increasing version code. The package and original signing configuration remain
 unchanged.
