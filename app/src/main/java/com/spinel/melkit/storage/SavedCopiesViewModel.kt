@@ -152,11 +152,15 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
         mutableState.update { it.copy(request = null, conflict = null, restored = null, busy = true, issue = null) }
         viewModelScope.launch {
             val result = library.restoreSavedResult(copy.path, copy.bytes, asCopy, openSource = { openCopy(copy) })
-            mutableState.update { it.copy(busy = false,
-                restored = if (result.status == "ok") result.path else null,
-                conflict = if (result.status == "exists" && !asCopy) copy else null,
-                issue = if (result.status == "ok" || (result.status == "exists" && !asCopy)) null else result.status) }
-            if (result.status == "ok") library.connect()
+            val publish = {
+                mutableState.update { it.copy(busy = false,
+                    restored = if (result.status == "ok") result.path else null,
+                    conflict = if (result.status == "exists" && !asCopy) copy else null,
+                    issue = if (result.status == "ok" || (result.status == "exists" && !asCopy)) null else result.status) }
+                if (result.status == "ok") library.connect()
+            }
+            if (result.status == "ok") library.adBreak(com.spinel.melkit.ads.AdPlacement.RESTORE, publish)
+            else publish()
         }
     }
     override fun onCleared() { previews.evictAll(); super.onCleared() }

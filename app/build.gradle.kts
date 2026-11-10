@@ -11,6 +11,11 @@ fun signingValue(name: String): String? = System.getenv(name)?.takeIf { it.isNot
 val releaseKeyPath = signingValue("MELKIT_KEYSTORE_PATH")
 val configuredVersionCode = providers.environmentVariable("MELKIT_VERSION_CODE")
     .map { it.toInt() }.getOrElse(1)
+// Signed phone-test builds use Google's test units until live serving is explicitly enabled.
+val liveAds = providers.environmentVariable("MELKIT_LIVE_ADS").orElse("false").map {
+    require(it == "true" || it == "false") { "MELKIT_LIVE_ADS must be true or false" }
+    it == "true"
+}.get()
 
 android {
     namespace = "com.spinel.melkit"
@@ -23,7 +28,8 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = configuredVersionCode
-        versionName = "0.1.13"
+        versionName = "0.1.14"
+        buildConfigField("boolean", "TEST_ADS", (!liveAds).toString())
     }
 
     signingConfigs {
@@ -83,6 +89,8 @@ tasks.configureEach {
 }
 
 dependencies {
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-messaging")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

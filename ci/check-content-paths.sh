@@ -6,6 +6,8 @@ javac -encoding UTF-8 -d "$melkit_test_dir" \
   app/src/main/java/com/spinel/melkit/storage/ContentPaths.java \
   app/src/main/java/com/spinel/melkit/storage/ContentCounts.java \
   app/src/main/java/com/spinel/melkit/push/PlayStoreLinks.java \
+  app/src/main/java/com/spinel/melkit/ads/AdPolicy.java \
+  app/src/main/java/com/spinel/melkit/ads/AdLoadPolicy.java \
   app/src/main/java/com/spinel/melkit/storage/ExportPaths.java \
   app/src/main/java/com/spinel/melkit/storage/PreviewImages.java \
   app/src/main/java/com/spinel/melkit/storage/NewFileRestore.java \
@@ -17,7 +19,7 @@ javac -encoding UTF-8 -d "$melkit_test_dir" \
   app/src/main/java/com/spinel/melkit/share/BatchRestore.java \
   tests/ContentPathsCheck.java tests/ExportPathsCheck.java tests/PreviewImagesCheck.java tests/RestoreCheck.java \
   tests/ModVaultCheck.java tests/ModProfilesCheck.java tests/FileScanCheck.java tests/ShareWireCheck.java \
-  tests/ContentBundleCheck.java tests/BatchRestoreCheck.java tests/ContentCountsCheck.java tests/RestoreCopyCheck.java tests/PlayStoreLinksCheck.java
+  tests/ContentBundleCheck.java tests/BatchRestoreCheck.java tests/ContentCountsCheck.java tests/RestoreCopyCheck.java tests/PlayStoreLinksCheck.java tests/AdPolicyCheck.java tests/AdLoadPolicyCheck.java
 java -cp "$melkit_test_dir" ContentPathsCheck
 java -cp "$melkit_test_dir" ExportPathsCheck
 java -cp "$melkit_test_dir" PreviewImagesCheck
@@ -31,5 +33,7 @@ java -cp "$melkit_test_dir" BatchRestoreCheck
 java -cp "$melkit_test_dir" ContentCountsCheck
 java -cp "$melkit_test_dir" RestoreCopyCheck
 java -cp "$melkit_test_dir" PlayStoreLinksCheck
+java -cp "$melkit_test_dir" AdPolicyCheck
+java -cp "$melkit_test_dir" AdLoadPolicyCheck
 
 

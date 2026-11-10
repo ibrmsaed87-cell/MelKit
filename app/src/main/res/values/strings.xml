@@ -125,17 +125,23 @@
     <string name="language_description">Choose Arabic or English. The layout follows your language.</string>
     <string name="appearance">Appearance</string>
     <string name="dark_theme">Dark theme</string>
-    <string name="version">Version %1$s</string>
+    <string name="version">App version</string>
     <string name="open_store">Open in Google Play</string>
     <string name="coming_to_store">Coming to Google Play</string>
     <string name="mmix_name" translatable="false">MMIX</string>
     <string name="mcfx_name" translatable="false">MCFX</string>
     <string name="mmkb_name" translatable="false">MCBK</string>
     <string name="mmix_description">Import Melon Sandbox mods, maps, and files easily.</string>
+    <string name="home_mmix_title">Add mods and maps</string>
+    <string name="home_mmix_description">Import them with MMIX, then organize them here.</string>
+    <string name="home_mmix_open">Open MMIX</string>
+    <string name="home_mmix_download">Download MMIX</string>
     <string name="mcfx_description">Fix and import Minecraft packs, add-ons, and worlds.</string>
     <string name="mmkb_description">Back up, restore, and share your Minecraft content.</string>
     <string name="developer_description">Explore more gaming tools from Spinel.</string>
     <string name="open_link_error">No app is available to open this link.</string>
+    <string name="ad_privacy_options">Privacy choices</string>
+    <string name="ad_privacy_error">Privacy choices are unavailable. Please try again.</string>
     <string name="game_library">Game library</string>
     <string name="library_readonly_notice">Access preview: browse and read files, or save a copy in Download/MelKit, organized by its game folder. Close the game first. Game files stay unchanged.</string>
     <string name="library_connect_title">Connect game files</string>
