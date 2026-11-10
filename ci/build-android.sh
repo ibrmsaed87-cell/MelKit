@@ -92,6 +92,7 @@ fi
 mkdir -p build/reports
 printf 'Package: com.spinel.melkit\nVersion code: %s\nSigning certificate SHA-256: %s\n' \
   "$MELKIT_VERSION_CODE" "$melkit_expected" > build/reports/melkit-build.txt
+printf 'Live AdMob units: %s\n' "${MELKIT_LIVE_ADS:-false}" >> build/reports/melkit-build.txt
 for melkit_apk in "${melkit_apks[@]}"; do
   "$melkit_apksigner" verify --print-certs "$melkit_apk" > "$melkit_signing_dir/apk-signature.txt"
   melkit_apk_cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$melkit_signing_dir/apk-signature.txt")"

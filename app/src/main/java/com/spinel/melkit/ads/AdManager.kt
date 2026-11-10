@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 import com.google.android.gms.ads.AdError
@@ -65,8 +66,9 @@ class AdManager private constructor(context: Context) {
     private var appOpenLoadedAt = 0L
     private var loadingInterstitial = false
     private var loadingAppOpen = false
-    private var nextInterstitialLoad = 0L
-    private var nextAppOpenLoad = 0L
+    private val interstitialLoadPolicy = AdLoadPolicy()
+    private val appOpenLoadPolicy = AdLoadPolicy()
+    private val preloadRetry = Runnable { preload() }
     private var showing = false
     private var shown = false
     private var showingOpen = false
@@ -80,9 +82,11 @@ class AdManager private constructor(context: Context) {
     }
 
     fun updateHost(route: String, allowAppOpen: Boolean, allowBreak: Boolean) {
+        val becameIdle = !breakAllowed && allowBreak
         this.route = route
         appOpenAllowed = allowAppOpen
         breakAllowed = allowBreak
+        if (becameIdle) preload()
     }
 
     fun suppressExternalReturn() { suppressNextOpen = true }
@@ -110,7 +114,12 @@ class AdManager private constructor(context: Context) {
         preload()
     }
 
-    fun onPause(owner: Activity) { if (activity.get() === owner) resumed = false }
+    fun onPause(owner: Activity) {
+        if (activity.get() === owner) {
+            resumed = false
+            handler.removeCallbacks(preloadRetry)
+        }
+    }
 
     fun onStop(owner: Activity, changingConfiguration: Boolean) {
         if (activity.get() === owner && !changingConfiguration) foreground = false
@@ -119,6 +128,7 @@ class AdManager private constructor(context: Context) {
     fun onDestroy(owner: Activity) {
         if (activity.get() !== owner) return
         resumed = false
+        handler.removeCallbacks(preloadRetry)
         activity.clear()
         // A destroyed host must never leave a verified result waiting on an SDK callback.
         if (showing) finishPresentation(showId)
@@ -273,6 +283,7 @@ class AdManager private constructor(context: Context) {
     }
 
     private fun invalidateAds() {
+        handler.removeCallbacks(preloadRetry)
         consentEpoch++
         interstitial = null
         appOpen = null
@@ -281,45 +292,78 @@ class AdManager private constructor(context: Context) {
     }
 
     private fun preload() {
-        if (!initialized || !consent.canRequestAds() || privacyBusy || !resumed || showing) return
+        handler.removeCallbacks(preloadRetry)
+        if (!initialized || !consent.canRequestAds() || privacyBusy || !resumed || showing ||
+            MelKitShareService.state.value.active) return
         val epoch = consentEpoch
         if (!fresh(interstitialLoadedAt, 60 * 60_000L)) interstitial = null
         if (!fresh(appOpenLoadedAt, 4 * 60 * 60_000L)) appOpen = null
-        if (interstitial == null && !loadingInterstitial && now() >= nextInterstitialLoad) {
+        if (interstitial == null && !loadingInterstitial && interstitialLoadPolicy.canLoad(loadClock())) {
             loadingInterstitial = true
-            nextInterstitialLoad = now() + 60_000L
             try {
                 InterstitialAd.load(app, if (BuildConfig.TEST_ADS) TEST_INTERSTITIAL else INTERSTITIAL,
                     AdRequest.Builder().build(), object : InterstitialAdLoadCallback() {
                         override fun onAdLoaded(ad: InterstitialAd) {
                             if (epoch != consentEpoch) return
                             loadingInterstitial = false
+                            interstitialLoadPolicy.loaded()
                             if (consent.canRequestAds()) { interstitial = ad; interstitialLoadedAt = now() }
                         }
                         override fun onAdFailedToLoad(error: LoadAdError) {
-                            if (epoch == consentEpoch) { loadingInterstitial = false; interstitial = null }
+                            if (epoch == consentEpoch) {
+                                loadingInterstitial = false
+                                interstitial = null
+                                interstitialLoadPolicy.failed(loadClock())
+                                schedulePreloadRetry()
+                            }
                         }
                     })
-            } catch (_: RuntimeException) { loadingInterstitial = false }
+            } catch (_: RuntimeException) {
+                loadingInterstitial = false
+                interstitialLoadPolicy.failed(loadClock())
+            }
         }
-        if (appOpen == null && !loadingAppOpen && now() >= nextAppOpenLoad) {
+        if (appOpen == null && !loadingAppOpen && appOpenLoadPolicy.canLoad(loadClock())) {
             loadingAppOpen = true
-            nextAppOpenLoad = now() + 60_000L
             try {
                 AppOpenAd.load(app, if (BuildConfig.TEST_ADS) TEST_APP_OPEN else APP_OPEN,
                     AdRequest.Builder().build(), object : AppOpenAd.AppOpenAdLoadCallback() {
                         override fun onAdLoaded(ad: AppOpenAd) {
                             if (epoch != consentEpoch) return
                             loadingAppOpen = false
+                            appOpenLoadPolicy.loaded()
                             if (consent.canRequestAds()) { appOpen = ad; appOpenLoadedAt = now() }
                         }
                         override fun onAdFailedToLoad(error: LoadAdError) {
-                            if (epoch == consentEpoch) { loadingAppOpen = false; appOpen = null }
+                            if (epoch == consentEpoch) {
+                                loadingAppOpen = false
+                                appOpen = null
+                                appOpenLoadPolicy.failed(loadClock())
+                                schedulePreloadRetry()
+                            }
                         }
                     })
-            } catch (_: RuntimeException) { loadingAppOpen = false }
+            } catch (_: RuntimeException) {
+                loadingAppOpen = false
+                appOpenLoadPolicy.failed(loadClock())
+            }
         }
+        schedulePreloadRetry()
     }
+
+    /** A retry may only fill a cache; showing still requires a new natural break/resume. */
+    private fun schedulePreloadRetry() {
+        handler.removeCallbacks(preloadRetry)
+        if (!initialized || !consent.canRequestAds() || privacyBusy || !resumed || showing ||
+            MelKitShareService.state.value.active) return
+        val delay = listOfNotNull(
+            if (interstitial == null && !loadingInterstitial) interstitialLoadPolicy.retryDelay(loadClock()) else null,
+            if (appOpen == null && !loadingAppOpen) appOpenLoadPolicy.retryDelay(loadClock()) else null
+        ).minOrNull() ?: return
+        handler.postDelayed(preloadRetry, delay.coerceAtLeast(1L))
+    }
+
+    private fun loadClock() = SystemClock.elapsedRealtime()
 
     private fun fresh(loadedAt: Long, lifetime: Long): Boolean =
         loadedAt > 0 && now() >= loadedAt && now() - loadedAt < lifetime

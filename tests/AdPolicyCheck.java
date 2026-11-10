@@ -73,6 +73,18 @@ public final class AdPolicyCheck {
         check(!p.appOpenEligible(START), "Future app-open timestamp fails closed");
         check(!p.interstitialEligible(START), "Future interstitial timestamps remain capped");
         check(!empty().appOpenEligible(0), "Zero clock value cannot create an opportunity");
+
+        p = empty(); p.normalForeground(); twoTasks(p); p.shown(false, START);
+        AdPolicy restarted = new AdPolicy(3, p.getLastClosed(), p.getLastAppOpen(), p.getInterstitials());
+        twoTasks(restarted);
+        check(!restarted.interstitialEligible(START + 89_999), "Process death before dismissal retains the minimum gap");
+        check(!restarted.appOpenEligible(START + 89_999), "A restart cannot stack app-open on the prior interstitial");
+        check(restarted.interstitialEligible(START + 90_000), "An absent dismissal cannot block ads forever");
+        restarted.closed(START - 1);
+        check(!restarted.interstitialEligible(START + 89_999), "Closing after clock rollback cannot shorten the gap");
+        restarted.closed(START + 30_000);
+        check(!restarted.interstitialEligible(START + 119_999), "A real dismissal extends the fallback gap");
+        check(restarted.interstitialEligible(START + 120_000), "Normal dismissal still controls the next opportunity");
         System.out.println("Ad policy checks passed: " + checks);
     }
 }

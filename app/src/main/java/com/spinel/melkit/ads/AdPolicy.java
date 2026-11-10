@@ -44,10 +44,12 @@ public final class AdPolicy {
     public void shown(boolean appOpen, long now) {
         if (appOpen) lastAppOpen = now;
         else { prune(now); interstitials.add(now); }
+        // Persist a minimum gap even if the process dies before dismissal.
+        lastClosed = Math.max(lastClosed, now);
         completedTasks = 0;
     }
 
-    public void closed(long now) { lastClosed = now; }
+    public void closed(long now) { lastClosed = Math.max(lastClosed, now); }
 
     private boolean gapPassed(long now) {
         return now > 0 && (lastClosed == 0 || (now >= lastClosed && now - lastClosed >= FULL_SCREEN_GAP_MS));

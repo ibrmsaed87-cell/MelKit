@@ -23,6 +23,8 @@ use Google's dedicated test units, including Release builds. Live IDs remain
 configured for a later release build explicitly using `MELKIT_LIVE_ADS=true`.
 Unexpected values fail Gradle configuration. The AdMob application ID is the
 real app ID so UMP can fetch this app's configured privacy messages.
+The build report records `Live AdMob units: true/false` so a phone-test artifact
+and a production artifact can be distinguished before distribution.
 
 No Gradle, APK/AAB or Android CI build was run for this source integration.
 The source version name is prepared as `0.1.14`; GitLab still supplies its
@@ -41,6 +43,9 @@ or building. Never bring back the old Git ignore exception or its tracked file.
 - Maximum three actual interstitial exposures in a rolling ten-minute window.
   Exposure history and the shared cooldown survive process restarts. Clock
   rollback does not remove future exposure timestamps or bypass cooldowns.
+- The show callback persists a fallback cooldown immediately. A real dismissal
+  extends it to 90 seconds after closing; process death before that callback
+  cannot discard the minimum gap between formats.
 - Opportunities are after verified backup/export, saved/received-file restore,
   fully successful batch restore, verified bundle creation, successful profile
   application, and explicit scan completion, before publishing their results.
@@ -77,8 +82,14 @@ an income guarantee or an assertion that the app has passed an AdMob review.
 - A fresh process has no cached ad: it continues without waiting, and preloads
   for a later foreground opportunity. An ad that arrives after entry never
   interrupts already-visible content.
-- Expiry: interstitial one hour; app-open four hours. Failed loads use an
-  event-driven retry with at least 60 seconds between attempts, not a retry loop.
+- Expiry: interstitial one hour; app-open four hours. A successfully consumed ad
+  can be replenished immediately; the old blanket one-minute load throttle no
+  longer discards this preload opportunity after a short ad.
+- Failed/no-fill requests retry after 60, 120, 240, 480, then at most 900 seconds,
+  using the monotonic device clock. There is at most one pending retry callback.
+  Retries only populate the cache and never display an ad. They stop when the
+  host pauses, privacy changes, a full-screen ad is active or transfer is active;
+  returning to the app or ending a transfer can resume cache preparation.
 
 ## UMP client behavior
 
@@ -97,12 +108,14 @@ an income guarantee or an assertion that the app has passed an AdMob review.
 - Ad creative content is capped at rating T. No child-directed or under-age
   consent status is inferred solely from the store's age rating.
 
-## AdMob dashboard work still required
+## AdMob dashboard status
 
-The client is integrated, but no AdMob dashboard changes or message publication
-have been observed or claimed. Plugin discovery found no AdMob connector.
+After the original login attempt failed, the user reported saving the existing
+published UMP message with 17 selected apps instead of 12 on 9 November 2026.
+Do not treat that old login failure as an outstanding blocker or repeat setup.
+This is user-confirmed dashboard work, not a new authenticated inspection.
 
-Prepare the European regulations message for the app ID above with:
+The release/device review should confirm the message for the app ID above has:
 
 1. Target **EEA, UK and Switzerland**, rather than Everywhere.
 2. English as default plus Arabic; review both previews.
@@ -117,12 +130,15 @@ Do not set a combined app-wide cap of three and assume it is interstitial-only.
 
 ## Verification completed and next phone checks
 
-The host suite passed all **456 checks**, including **34 new ad-policy checks**
-for first-task behavior, real-exposure counting, rolling caps, shared cooldown,
-restart persistence, clock rollback and app-open eligibility. Changed Kotlin
-syntax (eight Kotlin files), nine XML files, 389 matching translation keys and
-placeholders, 384 application string references, drawable references, matching
-mail IDs, CI shell syntax and Git diff checks passed before publishing source.
+On 10 November the host suite passed all **476 checks**: the existing 456 plus
+14 load/retry checks and six crash/dismissal cooldown regressions. They cover
+immediate replenishment after success, failure boundaries, capped backoff,
+reset after recovery and independence of the two formats, in addition to the
+existing first-task, rolling-cap and app-open rules. Changed AdManager Kotlin
+syntax, nine XML files, 389 matching translatable resource keys/placeholders,
+CI shell syntax and Git diff checks passed. The original source integration
+also checked eight Kotlin files, 384 string references, drawable references
+and the email IDs.
 Firebase remains untracked and ignored. These do not establish Android compilation,
 SDK network responses, live ad fill, regional form delivery or phone behavior.
 
@@ -132,6 +148,9 @@ After dashboard setup and an explicitly authorized combined test build, check:
   previous APK, and FCM links.
 - Google's test-ad labels, first-task-free behavior, task and timing thresholds,
   and direct results with no ad/no internet.
+- After a short test ad, verify replacement loading without waiting for a new
+  user task. Simulate no-fill/offline and recovery; retries must never show ads
+  on their own, or run in the background/during a direct transfer.
 - Home foreground ads after normal visits; no ad on external return, notification
   taps, rotation, consent, file operations or two-phone transfer.
 - Success results after ad dismissal or show failure; no lost copy or repeated
@@ -139,6 +158,11 @@ After dashboard setup and an explicitly authorized combined test build, check:
 - EEA/UK/Swiss required form, a non-EEA test location, saved consent and its
   withdrawal entry. Force test geography only for registered test devices.
 - Switch to live serving only for the release build after successful tests.
+
+The 90-second gap and caps are MelKit's initial product settings, not Google's
+numeric guarantee of compliance or maximum revenue. Google's policy disallows
+interstitials after every action and requires natural breaks. Evaluate real
+revenue and continued use after release before changing these settings.
 
 ## Primary references
 
