@@ -91,6 +91,12 @@ class AdManager private constructor(context: Context) {
 
     fun suppressExternalReturn() { suppressNextOpen = true }
 
+    fun onUserAction(owner: Activity) {
+        if (activity.get() === owner && resumed && !privacyBusy && !showing) {
+            policy.userAction()
+        }
+    }
+
     fun onResume(owner: Activity, systemDialog: Boolean) {
         activity = WeakReference(owner)
         resumed = true

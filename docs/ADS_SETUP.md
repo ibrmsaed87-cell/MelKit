@@ -36,15 +36,23 @@ or building. Never bring back the old Git ignore exception or its tracked file.
 
 ## Interstitial strategy
 
-- A genuine foreground visit starts with zero completed tasks: its first task
-  has no interstitial. At least two successful tasks must complete before a
-  presentation opportunity. A whole restore batch counts once.
-- At least 90 seconds must pass after closing either full-screen format.
-- Maximum three actual interstitial exposures in a rolling ten-minute window.
+- Every verified successful task is a presentation opportunity, including the
+  first task of a normal visit; two successful tasks are no longer required.
+  A whole restore batch counts once.
+- A separate minimum of two observed in-app user actions is required since the
+  last full-screen exposure/normal visit. Completed tasks do not manufacture
+  action credit. MainActivity counts handled gesture releases and activation/
+  Back key releases only while the host is resumed, with no consent or ad UI.
+  Move events, extra fingers, cancellations, SDK/load callbacks and synthetic
+  task callbacks do not create action credit. Input in another window (such as
+  a dialog or accessibility-only activation) may be conservatively uncounted;
+  this can skip an opportunity, never force an extra ad. No raw input is saved.
+- At least 50 seconds must pass after closing either full-screen format.
+- Maximum three actual interstitial exposures in a rolling five-minute window.
   Exposure history and the shared cooldown survive process restarts. Clock
   rollback does not remove future exposure timestamps or bypass cooldowns.
 - The show callback persists a fallback cooldown immediately. A real dismissal
-  extends it to 90 seconds after closing; process death before that callback
+  extends it to 50 seconds after closing; process death before that callback
   cannot discard the minimum gap between formats.
 - Opportunities are after verified backup/export, saved/received-file restore,
   fully successful batch restore, verified bundle creation, successful profile
@@ -71,7 +79,7 @@ an income guarantee or an assertion that the app has passed an AdMob review.
 - Eligible after three normal foreground visits; rotation, permission handling,
   notification handling and returning from an externally launched activity or
   ad are excluded from the normal-visit opportunity.
-- Maximum one app-open exposure per ten minutes, with the same 90-second gap
+- Maximum one app-open exposure per ten minutes, with the same 50-second gap
   shared with interstitials. Never stack formats.
 - Presentation is attempted synchronously at foreground resume, only on an
   idle Home screen and with a live foreground host. Work, transfer and consent
@@ -124,17 +132,20 @@ The release/device review should confirm the message for the app ID above has:
 5. Review applicable US state privacy settings separately if used. Their opt-out
    options are distinct from the European startup form.
 
-Optional matching dashboard unit caps: interstitial 3 / 10 minutes and app-open
+Optional matching dashboard unit caps: interstitial 3 / 5 minutes and app-open
 1 / 10 minutes. The code enforces these caps without relying on the dashboard.
 Do not set a combined app-wide cap of three and assume it is interstitial-only.
 
 ## Verification completed and next phone checks
 
-On 10 November the host suite passed all **476 checks**: the existing 456 plus
-14 load/retry checks and six crash/dismissal cooldown regressions. They cover
+On 10 November the host suite passed all **483 checks**, including 47 ad-policy
+checks and 14 loading/retry checks. The updated boundary cases cover 49,999 vs
+50,000 ms after dismissal and 299,999 vs 300,000 ms for the rolling interstitial
+cap, first-task eligibility, the separate two-action guard, and unchanged
+app-open ten-minute cap. They also cover
 immediate replenishment after success, failure boundaries, capped backoff,
 reset after recovery and independence of the two formats, in addition to the
-existing first-task, rolling-cap and app-open rules. Changed AdManager Kotlin
+existing rolling-cap and app-open rules. Changed AdManager/MainActivity Kotlin
 syntax, nine XML files, 389 matching translatable resource keys/placeholders,
 CI shell syntax and Git diff checks passed. The original source integration
 also checked eight Kotlin files, 384 string references, drawable references
@@ -146,7 +157,7 @@ After dashboard setup and an explicitly authorized combined test build, check:
 
 - Both existing MMIX/version-card edits, Arabic/English, installation over the
   previous APK, and FCM links.
-- Google's test-ad labels, first-task-free behavior, task and timing thresholds,
+- Google's test-ad labels, first-task opportunities, two-action guard, timing thresholds,
   and direct results with no ad/no internet.
 - After a short test ad, verify replacement loading without waiting for a new
   user task. Simulate no-fill/offline and recovery; retries must never show ads
@@ -159,9 +170,13 @@ After dashboard setup and an explicitly authorized combined test build, check:
   withdrawal entry. Force test geography only for registered test devices.
 - Switch to live serving only for the release build after successful tests.
 
-The 90-second gap and caps are MelKit's initial product settings, not Google's
+The 50-second gap and 3/5-minute interstitial cap are the user's product settings, not Google's
 numeric guarantee of compliance or maximum revenue. Google's policy disallows
-interstitials after every action and requires natural breaks. Evaluate real
+interstitials after every action, specifies no more than one after two user
+actions, and requires natural breaks. A successful task is distinct from a
+single click: navigation, selection and confirmation can provide multiple
+interactions before that task ends. Time and cap alone do not replace this
+guard. Evaluate real
 revenue and continued use after release before changing these settings.
 
 ## Primary references

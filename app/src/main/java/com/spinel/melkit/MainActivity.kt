@@ -5,6 +5,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -75,6 +77,21 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() { ads.onPause(this); super.onPause() }
     override fun onStop() { ads.onStop(this, isChangingConfigurations); super.onStop() }
     override fun onDestroy() { ads.onDestroy(this); super.onDestroy() }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val handled = super.dispatchTouchEvent(event)
+        // One completed gesture, irrespective of move events or the number of fingers.
+        if (handled && event.actionMasked == MotionEvent.ACTION_UP) ads.onUserAction(this)
+        return handled
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val handled = super.dispatchKeyEvent(event)
+        if (handled && event.action == KeyEvent.ACTION_UP && !event.isCanceled &&
+            event.keyCode in listOf(KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_BACK)) ads.onUserAction(this)
+        return handled
+    }
 
     override fun startActivity(intent: Intent, options: Bundle?) {
         ads.suppressExternalReturn()
