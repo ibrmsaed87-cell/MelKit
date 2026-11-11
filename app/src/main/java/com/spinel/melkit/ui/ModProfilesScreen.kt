@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -41,13 +43,15 @@ fun ModProfilesScreen(state: ModProfilesState, model: ModProfilesViewModel, libr
                 Text(stringResource(if (editor?.id == "core") R.string.profile_core_body else R.string.profile_body_short))
                 if (!connection.connected) Text(stringResource(R.string.saved_connect_help))
                 if (editor == null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(modifier = Modifier.weight(1f), enabled = !busy, onClick = {
-                            if (connection.connected) model.refresh(library) else library.connect()
-                        }) { Text(stringResource(if (connection.connected) R.string.library_refresh else R.string.library_connect)) }
-                        FilledTonalButton(modifier = Modifier.weight(1f), enabled = connection.connected && !busy && !state.recovery,
-                            onClick = { model.edit(library) }) { Text(stringResource(R.string.profile_new)) }
-                    }
+                    ActionButtons(listOf(
+                        ActionButton(stringResource(if (connection.connected) R.string.library_refresh else R.string.library_connect),
+                            Icons.Outlined.Refresh, enabled = !busy, onClick = {
+                                if (connection.connected) model.refresh(library) else library.connect()
+                            }),
+                        ActionButton(stringResource(R.string.profile_new), Icons.Outlined.Add,
+                            enabled = connection.connected && !busy && !state.recovery, primary = true,
+                            onClick = { model.edit(library) }),
+                    ))
                     if (!connection.connected) TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
                 }
                 if (busy) {
@@ -80,11 +84,13 @@ fun ModProfilesScreen(state: ModProfilesState, model: ModProfilesViewModel, libr
                         modifier = Modifier.fillMaxWidth(), enabled = !busy, singleLine = true,
                         label = { Text(stringResource(R.string.profile_search)) })
                     Text(stringResource(R.string.profile_selected_count, editor.selected.size))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(enabled = !busy && connection.connected && (editor.id == "core" || editor.name.isNotBlank()),
-                            onClick = { model.save(library) }) { Text(stringResource(R.string.profile_save)) }
-                        TextButton(enabled = !busy, onClick = model::closeEditor) { Text(stringResource(R.string.saved_cancel)) }
-                    }
+                    ActionButtons(listOf(
+                        ActionButton(stringResource(R.string.profile_save), Icons.Outlined.Save,
+                            enabled = !busy && connection.connected && (editor.id == "core" || editor.name.isNotBlank()),
+                            primary = true, onClick = { model.save(library) }),
+                        ActionButton(stringResource(R.string.saved_cancel), Icons.Outlined.Close,
+                            enabled = !busy, onClick = model::closeEditor),
+                    ))
                 }
             }
             val choices = editor.choices.filter { it.name.contains(editor.query, ignoreCase = true) || it.path.contains(editor.query, ignoreCase = true) }
@@ -109,15 +115,17 @@ fun ModProfilesScreen(state: ModProfilesState, model: ModProfilesViewModel, libr
             item {
                 Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(enabled = connection.connected && !busy && !state.recovery,
-                        onClick = { model.edit(library, "core") }) { Text(stringResource(R.string.profile_core_count, state.coreCount)) }
-                    if (state.undo) FilledTonalButton(enabled = connection.connected && !busy,
-                        onClick = { model.request(ProfileRequest("undo")) }) {
-                        Text(stringResource(if (state.recovery) R.string.profile_recover else R.string.profile_undo))
+                        ActionButtons(listOf(
+                            ActionButton(stringResource(R.string.profile_core_count, state.coreCount), Icons.Outlined.Inventory2,
+                                enabled = connection.connected && !busy && !state.recovery,
+                                onClick = { model.edit(library, "core") }),
+                            ActionButton(stringResource(if (state.recovery) R.string.profile_recover else R.string.profile_undo),
+                                Icons.Outlined.Restore, enabled = connection.connected && !busy && state.undo,
+                                onClick = { model.request(ProfileRequest("undo")) }),
+                        ))
                     }
                 }
             }
-                }
             state.result?.let { result -> item {
                 Text(stringResource(when (result) {
                     "apply" -> R.string.profile_applied
@@ -137,12 +145,13 @@ fun ModProfilesScreen(state: ModProfilesState, model: ModProfilesViewModel, libr
                             onClick = { model.request(ProfileRequest("apply", profile.id, profile.name)) }) {
                             Text(stringResource(R.string.profile_apply))
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(modifier = Modifier.weight(1f), enabled = connection.connected && !busy && !state.recovery,
-                                onClick = { model.edit(library, profile.id) }) { Text(stringResource(R.string.profile_edit)) }
-                            OutlinedButton(modifier = Modifier.weight(1f), enabled = connection.connected && !busy && !state.recovery,
-                                onClick = { model.request(ProfileRequest("delete", profile.id, profile.name)) }) { Text(stringResource(R.string.profile_delete)) }
-                        }
+                        ActionButtons(listOf(
+                            ActionButton(stringResource(R.string.profile_edit), Icons.Outlined.Edit,
+                                enabled = connection.connected && !busy && !state.recovery, onClick = { model.edit(library, profile.id) }),
+                            ActionButton(stringResource(R.string.profile_delete), Icons.Outlined.Delete,
+                                enabled = connection.connected && !busy && !state.recovery,
+                                onClick = { model.request(ProfileRequest("delete", profile.id, profile.name)) }),
+                        ))
                     }
                 }
             }

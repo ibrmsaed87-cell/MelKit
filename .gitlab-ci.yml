@@ -30,6 +30,7 @@ validate_foundation:
     - test -s .github/workflows/sync-gitlab.yml
     - bash -n ci/sync-gitlab.sh
     - bash -n ci/build-android.sh
+    - bash -n ci/ad-mode.sh
     - bash -n ci/setup-android.sh
     - bash -n ci/check-content-paths.sh
     - bash -n ci/prepare-firebase.sh

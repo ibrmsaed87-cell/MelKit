@@ -83,6 +83,9 @@ val verifyPermanentSigning by tasks.registering {
 }
 
 tasks.configureEach {
+    if (name == "bundleRelease") {
+        doFirst { check(liveAds) { "Publishing a Release AAB requires MELKIT_LIVE_ADS=true." } }
+    }
     if (name == "preReleaseBuild") dependsOn(verifyPermanentSigning)
     if (name == "assembleDebug" || name == "packageDebug") {
         doFirst { error("Distribute a release APK signed with the permanent MelKit key.") }

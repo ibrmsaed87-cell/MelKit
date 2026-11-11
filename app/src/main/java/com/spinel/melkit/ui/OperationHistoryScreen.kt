@@ -3,7 +3,10 @@ package com.spinel.melkit.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -109,12 +112,17 @@ internal fun OperationHistoryScreen(library: GameLibraryViewModel, connection: G
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.history_recovery_help))
                         if (connection.connected) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                RecoverySection.entries.forEach { option ->
-                                    FilterChip(selected = section == option, enabled = !busy, onClick = { section = option },
-                                        label = { Text(stringResource(option.label)) })
-                                }
-                            }
+                            ActionButtons(listOf(
+                                ActionButton(stringResource(RecoverySection.GROUPS.label), Icons.Outlined.Layers,
+                                    enabled = !busy, primary = section == RecoverySection.GROUPS,
+                                    onClick = { section = RecoverySection.GROUPS }),
+                                ActionButton(stringResource(RecoverySection.MODS.label), Icons.Outlined.Inventory2,
+                                    enabled = !busy, primary = section == RecoverySection.MODS,
+                                    onClick = { section = RecoverySection.MODS }),
+                                ActionButton(stringResource(RecoverySection.QUARANTINE.label), Icons.Outlined.Shield,
+                                    enabled = !busy, primary = section == RecoverySection.QUARANTINE,
+                                    onClick = { section = RecoverySection.QUARANTINE }),
+                            ))
                             TextButton(enabled = ready, onClick = { refresh() }) { Text(stringResource(R.string.library_refresh)) }
                         } else {
                             Text(stringResource(R.string.saved_connect_help))

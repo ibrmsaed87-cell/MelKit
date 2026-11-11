@@ -43,7 +43,7 @@ internal fun SavedBundleCard(item: SavedBundle, model: ShareViewModel, enabled: 
                         FileAction(R.string.share_other_apps, Icons.Outlined.Share) { menu = false; model.shareSavedBundle(context, item) }
                         FileAction(R.string.bundle_rename, Icons.Outlined.Edit) { menu = false; dialog = "rename" }
                         FileAction(R.string.file_details, Icons.Outlined.Info) { menu = false; dialog = "details" }
-                        FileAction(R.string.profile_delete, Icons.Outlined.Delete) { menu = false; dialog = "delete" }
+                        FileAction(R.string.file_delete, Icons.Outlined.Delete) { menu = false; dialog = "delete" }
                     }
                 }
             }
@@ -58,9 +58,9 @@ internal fun SavedBundleCard(item: SavedBundle, model: ShareViewModel, enabled: 
         }) { Text(stringResource(R.string.profile_save)) } },
         dismissButton = { TextButton(onClick = { dialog = "" }) { Text(stringResource(R.string.saved_cancel)) } })
     if (dialog == "delete") AlertDialog(onDismissRequest = { dialog = "" },
-        title = { Text(stringResource(R.string.profile_delete)) },
+        title = { Text(stringResource(R.string.file_delete)) },
         text = { Text(stringResource(R.string.delete_file_confirm, item.name)) },
-        confirmButton = { TextButton(onClick = { dialog = ""; model.deleteBundle(item) }) { Text(stringResource(R.string.profile_delete)) } },
+        confirmButton = { TextButton(onClick = { dialog = ""; model.deleteBundle(item) }) { Text(stringResource(R.string.file_delete)) } },
         dismissButton = { TextButton(onClick = { dialog = "" }) { Text(stringResource(R.string.saved_cancel)) } })
 }
 

@@ -130,7 +130,7 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
                         FileActionsMenu(showActions, { showActions = false }) {
                             FileAction(R.string.file_details, Icons.Outlined.Info) { showActions = false; model.showDetails(copy) }
                             FileAction(R.string.share_other_apps, Icons.Outlined.Share, !state.busy) { showActions = false; model.share(context, copy) }
-                            FileAction(R.string.profile_delete, Icons.Outlined.Delete, !state.busy) { showActions = false; model.requestDelete(copy) }
+                            FileAction(R.string.file_delete, Icons.Outlined.Delete, !state.busy) { showActions = false; model.requestDelete(copy) }
                         }
                     }
                     if (copy.restorable) FilledTonalButton(onClick = { model.requestRestore(copy) },
@@ -151,9 +151,9 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
     }
     state.deleting?.let { copy ->
         AlertDialog(onDismissRequest = model::dismissDelete,
-            title = { Text(stringResource(R.string.profile_delete)) },
+            title = { Text(stringResource(R.string.file_delete)) },
             text = { Text(stringResource(R.string.delete_file_confirm, copy.name)) },
-            confirmButton = { TextButton(enabled = !state.busy, onClick = model::deleteConfirmed) { Text(stringResource(R.string.profile_delete)) } },
+            confirmButton = { TextButton(enabled = !state.busy, onClick = model::deleteConfirmed) { Text(stringResource(R.string.file_delete)) } },
             dismissButton = { TextButton(onClick = model::dismissDelete) { Text(stringResource(R.string.saved_cancel)) } })
     }
     state.request?.let { copy ->

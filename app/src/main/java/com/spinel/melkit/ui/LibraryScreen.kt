@@ -29,6 +29,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.HelpOutline
+import androidx.compose.material.icons.outlined.Label
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Edit
@@ -119,15 +126,21 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
         }
         item {
             Text(stringResource(R.string.library_readonly_notice), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onOrganize) { Text(stringResource(R.string.categories)) }
+            OutlinedButton(onClick = onOrganize, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Icon(Icons.Outlined.Label, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.categories), Modifier.weight(1f))
+                Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(20.dp))
+            }
         }
         if (!state.connected) item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.library_connect_body))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(onClick = model::connect, enabled = !state.busy) { Text(stringResource(R.string.library_connect)) }
-                    TextButton(onClick = onGuide) { Text(stringResource(R.string.library_help)) }
-                }
+                ActionButtons(listOf(
+                    ActionButton(stringResource(R.string.library_connect), Icons.Outlined.Refresh,
+                        enabled = !state.busy, primary = true, onClick = model::connect),
+                    ActionButton(stringResource(R.string.library_help), Icons.Outlined.HelpOutline, onClick = onGuide),
+                ))
             }
         }
         if (state.path.isEmpty()) item { ContentFolderGrid(state, model::browse) }
@@ -139,10 +152,10 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
                 }
             }
         }
-        if (state.loaded) {
+        if (state.loaded && state.path.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(if (state.path.isEmpty()) R.string.library_game_folders else R.string.library_current_folder),
+                    Text(stringResource(R.string.library_current_folder),
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (state.path.isNotEmpty()) {
                         Text(state.path, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr))
@@ -156,7 +169,7 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
             }
             if (state.entries.isEmpty() && state.issue == null && !state.busy) {
                 item {
-                    Text(stringResource(if (state.path.isEmpty()) R.string.library_no_folders else R.string.library_folder_empty),
+                    Text(stringResource(R.string.library_folder_empty),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -178,7 +191,7 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
                         }
                     })
             }
-            if (state.total > 0) {
+            if (state.offset > 0 || state.hasNext) {
                 item {
                     Column {
                         Text(stringResource(R.string.library_page, numbers.format(state.offset + 1),

@@ -39,6 +39,9 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
@@ -385,20 +388,21 @@ private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, prof
         }
     }
     Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(if (connected) R.string.library_connected else R.string.library_connect_title), fontWeight = FontWeight.Bold)
             Text(stringResource(if (connected) R.string.library_ready_body else R.string.library_connect_body))
             FilledTonalButton(enabled = !state.busy, onClick = {
                 if (connected) library.browse("") else library.connect()
                 navigate("library")
             }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.library_browse)) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(enabled = !state.busy, onClick = library::connect) {
-                    Text(stringResource(if (connected) R.string.library_refresh else R.string.library_connect))
-                }
-                TextButton(onClick = { openShizuku(context) }) { Text(stringResource(R.string.open_shizuku)) }
-                TextButton(onClick = { navigate("shizuku") }) { Text(stringResource(R.string.library_help)) }
-            }
+            ActionButtons(listOf(
+                ActionButton(stringResource(if (connected) R.string.library_refresh else R.string.library_connect),
+                    Icons.Outlined.Refresh, enabled = !state.busy, onClick = library::connect),
+                ActionButton(stringResource(R.string.open_shizuku), Icons.Outlined.OpenInNew,
+                    onClick = { openShizuku(context) }),
+                ActionButton(stringResource(R.string.library_help), Icons.Outlined.HelpOutline,
+                    onClick = { navigate("shizuku") }),
+            ), maxColumns = 3)
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

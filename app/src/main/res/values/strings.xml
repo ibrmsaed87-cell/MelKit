@@ -116,7 +116,7 @@
     <string name="shizuku_later_body">Usually, open Shizuku and start the service. Repeat pairing only if Shizuku or Android requests it.</string>
     <string name="shizuku_video_title">Video setup guide</string>
     <string name="shizuku_video_note">Watch the English guide without internet. Pairing is needed for first-time setup; later, usually just open Shizuku and start the service.</string>
-    <string name="shizuku_video_watch">Watch the English video</string>
+    <string name="shizuku_video_watch">Watch Tutorial Video</string>
     <string name="shizuku_video_loading">Loading the setup video</string>
     <string name="shizuku_video_error">Could not play the video. Try again, or return to the guide to read the setup steps.</string>
     <string name="shizuku_video_retry">Try again</string>
@@ -427,6 +427,7 @@
     <string name="bundle_download_report">Downloads: %1$d saved, %2$d failed. See each file for its result.</string>
     <string name="backup_created">Created: %1$s</string>
     <string name="backup_modified">Modified: %1$s</string>
+    <string name="file_delete">Delete File</string>
 </resources>
 
 

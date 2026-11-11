@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -51,16 +53,23 @@ fun FileScanScreen(state: FileScanState, model: FileScanViewModel, library: Game
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(if (state.tab == 0) R.string.scanner_description else R.string.scan_vault_description))
-                    if (connection.connected) {
-                        FilledTonalButton(enabled = ready, onClick = {
-                            if (state.tab == 0) model.start(library) else model.vaultPage(library)
-                        }) { Text(stringResource(if (state.tab == 0) R.string.scan_start else R.string.library_refresh)) }
-                    } else {
+                    if (state.tab == 0) {
+                        ActionButtons(listOf(
+                            ActionButton(stringResource(R.string.scan_start), Icons.Outlined.Search,
+                                enabled = ready, primary = true, onClick = { model.start(library) }),
+                            ActionButton(stringResource(R.string.scan_isolate_selected, state.selection.size), Icons.Outlined.Shield,
+                                enabled = ready && scan != null && state.selection.isNotEmpty(), onClick = model::requestQuarantine),
+                        ))
+                    } else if (connection.connected) {
+                        FilledTonalButton(enabled = ready, onClick = { model.vaultPage(library) }) { Text(stringResource(R.string.library_refresh)) }
+                    }
+                    if (!connection.connected) {
                         Text(stringResource(R.string.saved_connect_help))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(enabled = !busy, onClick = library::connect) { Text(stringResource(R.string.library_connect)) }
-                            TextButton(onClick = guide) { Text(stringResource(R.string.shizuku_guide)) }
-                        }
+                        ActionButtons(listOf(
+                            ActionButton(stringResource(R.string.library_connect), Icons.Outlined.Refresh,
+                                enabled = !busy, primary = true, onClick = library::connect),
+                            ActionButton(stringResource(R.string.shizuku_guide), Icons.Outlined.HelpOutline, onClick = guide),
+                        ))
                     }
                     if (busy) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                     if (state.moved > 0) Text(stringResource(R.string.scan_moved, state.moved), color = MelkitMint)
@@ -88,11 +97,6 @@ fun FileScanScreen(state: FileScanState, model: FileScanViewModel, library: Game
                         Text(stringResource(R.string.scan_summary, scan.files, scan.total))
                         if (scan.partial) Text(stringResource(R.string.scan_partial), color = MaterialTheme.colorScheme.error)
                         if (scan.total == 0 && !scan.partial) Text(stringResource(R.string.scan_clear))
-                        if (state.selection.isNotEmpty()) {
-                            FilledTonalButton(enabled = ready, onClick = model::requestQuarantine) {
-                                Text(stringResource(R.string.scan_isolate_selected, state.selection.size))
-                            }
-                        }
                         if (state.selection.size == FileScanViewModel.PAGE_SIZE) Text(stringResource(R.string.scan_batch_limit))
                     }
                 }

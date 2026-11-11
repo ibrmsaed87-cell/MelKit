@@ -211,3 +211,28 @@ tasks use the same coordinator; they do not change vault/quarantine file engines
 Failed and partial operations have no new ad opportunity. Transfer and consent
 still block presentation. Regional consent delivery remains a device/dashboard
 validation item; no manual language/country bypass was added.
+
+## Final phone review — 11 November 2026: explicit CI selection
+
+The tested APK intentionally used demo units. The configured production app ID
+and two production unit IDs above are unchanged, as are UMP, the two-action guard,
+50-second shared gap and exposure caps. No live SDK requests were made for this review.
+
+| Build purpose | BUILD_AAB | MELKIT_LIVE_ADS | Serving |
+| --- | --- | --- | --- |
+| Debug configuration | any | any | Always demo units; existing distribution guard remains |
+| Signed phone-test APK | false | false (default for APK-only CI) | Demo units |
+| Production signed APK | false | true | Verified MelKit units |
+| Production APK and AAB | true | true (default when AAB is true) | Verified MelKit units |
+
+For a later authorized GitLab run, set the variables above in Run pipeline → Variables.
+`ci/ad-mode.sh` validates booleans before signing/tool downloads and rejects
+`BUILD_AAB=true` with `MELKIT_LIVE_ADS=false`. Gradle also refuses `bundleRelease`
+with test serving. APK-only Release variants remain testable with the permanent
+signing key, so phone tests can install over the existing APK without uninstalling.
+The production Gradle Release default is true when invoked outside the CI wrapper;
+Debug overrides it to test mode. Google demo IDs exist only as the test selection
+in the shared coordinator and are never selected when `BuildConfig.TEST_ADS=false`.
+No advertising placements, timing, consent routing or transfer/write/scan boundaries
+were modified. APK content/network serving must still be verified after the next
+explicitly authorized build; do not repeatedly test production impressions.

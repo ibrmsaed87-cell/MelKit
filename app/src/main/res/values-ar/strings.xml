@@ -112,7 +112,7 @@
     <string name="shizuku_later_body">عادةً يكفي فتح Shizuku وبدء الخدمة. أعد الاقتران فقط إذا طلب Shizuku أو نظام أندرويد ذلك.</string>
     <string name="shizuku_video_title">شرح الإعداد بالفيديو</string>
     <string name="shizuku_video_note">شاهد الشرح العربي دون إنترنت. الاقتران مطلوب عند الإعداد أول مرة؛ لاحقًا يكفي عادةً فتح Shizuku وبدء الخدمة.</string>
-    <string name="shizuku_video_watch">مشاهدة الفيديو العربي</string>
+    <string name="shizuku_video_watch">مشاهدة فيديو الشرح</string>
     <string name="shizuku_video_loading">جارٍ تحميل فيديو الإعداد</string>
     <string name="shizuku_video_error">تعذر تشغيل الفيديو. حاول مجددًا، أو عُد إلى الدليل لقراءة خطوات الإعداد.</string>
     <string name="shizuku_video_retry">المحاولة مجددًا</string>
@@ -420,6 +420,7 @@
     <string name="bundle_download_report">التنزيلات: %1$d ناجح، %2$d فاشل. راجع نتيجة كل ملف.</string>
     <string name="backup_created">تاريخ الإنشاء: %1$s</string>
     <string name="backup_modified">تاريخ التعديل: %1$s</string>
+    <string name="file_delete">حذف الملف</string>
 </resources>
 
 

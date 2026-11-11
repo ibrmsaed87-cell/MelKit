@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Validate serving mode before accessing signing secrets or downloading build tools.
+source ci/ad-mode.sh
+
 # Fail closed: this script never generates or substitutes signing keys.
 umask 077
 melkit_signing_dir="$(mktemp -d)"
@@ -64,9 +67,6 @@ if (( MELKIT_VERSION_CODE < 1 || MELKIT_VERSION_CODE > 2100000000 )); then
   printf '%s\n' 'Version code is outside the supported Android/Play range.' >&2
   exit 1
 fi
-
-# APK-only runs stay in test mode; an authorized AAB release defaults to verified live units.
-export MELKIT_LIVE_ADS="${MELKIT_LIVE_ADS:-${BUILD_AAB:-false}}"
 
 # The Android module uses the signing/version environment variables above.
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$CI_PROJECT_DIR/.gradle}"
