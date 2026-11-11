@@ -15,7 +15,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 35
     steps:
       - name: Check whether the GitLab secret is configured
         id: gitlab
@@ -42,3 +42,8 @@ jobs:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_REPOSITORY_URL: ${{ vars.GITLAB_REPOSITORY_URL }}
         run: bash ci/sync-gitlab.sh
+      - name: Observe authorized GitLab APK build
+        if: steps.gitlab.outputs.ready == 'true' && contains(github.event.head_commit.message, '[build apk]')
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: python3 ci/report-gitlab-build.py
