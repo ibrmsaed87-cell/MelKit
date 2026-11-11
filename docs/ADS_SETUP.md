@@ -1,4 +1,18 @@
-# MelKit AdMob and UMP — 0.1.14 phone-test build
+# MelKit AdMob and UMP
+
+## Authorized production delivery — 0.1.16, 11 November 2026
+
+The user now requests both signed production APK and AAB. GitLab YAML defaults
+are explicitly `BUILD_AAB=true` and `MELKIT_LIVE_ADS=true` for this delivery.
+Debug still forces test ads. For repeated phone-test APKs, override **both**
+variables to `false` in Run pipeline; the APK-only default in `ci/ad-mode.sh`
+applies when that script is invoked without the YAML variables.
+The build checks generated Release `BuildConfig.TEST_ADS=false`, the original
+certificate on both artifacts, and records their SHA-256 hashes before exposing
+them. No AdMob timing, placements or UMP behavior changed. Build success and
+artifact availability must be observed separately; source configuration alone
+is not proof of a completed build. The earlier entries below document prior
+phone-test/source-only phases.
 
 The user approved interstitial and app-open ads only, with the strategy below,
 and asked to retrieve the IDs from the latest Gmail message. The Google AdMob

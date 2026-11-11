@@ -19,7 +19,10 @@ variables:
   ANDROID_COMPILE_SDK: "36"
   ANDROID_BUILD_TOOLS: "36.0.0"
   ANDROID_COMMAND_LINE_TOOLS: "11076708"
-  BUILD_AAB: "false"
+  # Authorized production delivery: both artifacts use the permanent key and live units.
+  # For repeated phone tests override BOTH values to false in Run pipeline.
+  BUILD_AAB: "true"
+  MELKIT_LIVE_ADS: "true"
   MELKIT_VERSION_CODE_BASE: "0"
 
 validate_foundation:

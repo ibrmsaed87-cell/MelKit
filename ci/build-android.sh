@@ -83,6 +83,15 @@ if [[ "${BUILD_AAB:-false}" == true ]]; then
 fi
 ./gradlew --no-daemon --console=plain "${melkit_tasks[@]}"
 
+# Verify the resolved variant, not just the environment used to request it.
+melkit_build_config=app/build/generated/source/buildConfig/release/com/spinel/melkit/BuildConfig.java
+melkit_test_ads=true
+if [[ "$MELKIT_LIVE_ADS" == true ]]; then melkit_test_ads=false; fi
+if ! grep -Eq "public static final boolean TEST_ADS = ${melkit_test_ads};" "$melkit_build_config"; then
+  printf '%s\n' 'Release BuildConfig advertising mode does not match the requested mode.' >&2
+  exit 1
+fi
+
 # Verify the produced APKs themselves; a keystore check alone is insufficient.
 melkit_apksigner="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/apksigner"
 melkit_aapt="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt"
@@ -96,6 +105,8 @@ mkdir -p build/reports
 printf 'Package: com.spinel.melkit\nVersion code: %s\nSigning certificate SHA-256: %s\n' \
   "$MELKIT_VERSION_CODE" "$melkit_expected" > build/reports/melkit-build.txt
 printf 'Live AdMob units: %s\n' "${MELKIT_LIVE_ADS:-false}" >> build/reports/melkit-build.txt
+printf 'Source commit: %s\n' "${CI_COMMIT_SHA:-unknown}" >> build/reports/melkit-build.txt
+printf 'BuildConfig.TEST_ADS: %s\n' "$melkit_test_ads" >> build/reports/melkit-build.txt
 for melkit_apk in "${melkit_apks[@]}"; do
   "$melkit_apksigner" verify --print-certs "$melkit_apk" > "$melkit_signing_dir/apk-signature.txt"
   melkit_apk_cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$melkit_signing_dir/apk-signature.txt")"
@@ -111,4 +122,24 @@ for melkit_apk in "${melkit_apks[@]}"; do
   fi
   sha256sum "$melkit_apk" >> build/reports/melkit-build.txt
 done
+
+if [[ "$BUILD_AAB" == true ]]; then
+  melkit_aabs=(app/build/outputs/bundle/release/*.aab)
+  if (( ${#melkit_aabs[@]} == 0 )); then
+    printf '%s\n' 'The requested release AAB was not produced.' >&2
+    exit 1
+  fi
+  for melkit_aab in "${melkit_aabs[@]}"; do
+    # jarsigner checks archive integrity; keytool additionally rejects unsigned/wrong-key bundles.
+    jarsigner -verify "$melkit_aab" > "$melkit_signing_dir/aab-verification.txt"
+    keytool -J-Duser.language=en -J-Duser.country=US -printcert -jarfile "$melkit_aab" \
+      > "$melkit_signing_dir/aab-certificate.txt"
+    melkit_aab_cert="$(sed -n 's/^[[:space:]]*SHA256: //p' "$melkit_signing_dir/aab-certificate.txt" | tr -d '\r\n:' | tr 'A-F' 'a-f')"
+    if [[ "$melkit_aab_cert" != "$melkit_expected" ]]; then
+      printf '%s\n' 'Built AAB uses an unexpected signing certificate. Refusing to publish artifacts.' >&2
+      exit 1
+    fi
+    sha256sum "$melkit_aab" >> build/reports/melkit-build.txt
+  done
+fi
 

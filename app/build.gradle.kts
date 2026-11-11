@@ -28,7 +28,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = configuredVersionCode
-        versionName = "0.1.15"
+        versionName = "0.1.16"
         buildConfigField("boolean", "TEST_ADS", (!liveAds).toString())
     }
 
