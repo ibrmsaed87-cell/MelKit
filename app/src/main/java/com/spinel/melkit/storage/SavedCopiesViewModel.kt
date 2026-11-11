@@ -27,7 +27,7 @@ import java.io.File
 import java.io.IOException
 import java.util.Locale
 
-data class SavedCopy(val uri: Uri, val name: String, val path: String, val bytes: Long, val modified: Long) {
+data class SavedCopy(val uri: Uri, val name: String, val path: String, val bytes: Long, val modified: Long, val created: Long = 0) {
     val extension: String get() = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
     val restorable: Boolean get() = NewFileRestore.supported(path)
 }
@@ -35,7 +35,7 @@ data class SavedCopy(val uri: Uri, val name: String, val path: String, val bytes
 data class SavedCopiesState(
     val copies: List<SavedCopy> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val issue: String? = null, val request: SavedCopy? = null, val restored: String? = null, val revision: Int = 0,
-    val conflict: SavedCopy? = null,
+    val conflict: SavedCopy? = null, val detail: SavedCopy? = null, val deleting: SavedCopy? = null,
 )
 
 class SavedCopiesViewModel(application: Application) : AndroidViewModel(application) {
@@ -71,7 +71,7 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
             val columns = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME,
-                MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.RELATIVE_PATH)
+                MediaStore.MediaColumns.SIZE, MediaStore.MediaColumns.DATE_MODIFIED, MediaStore.MediaColumns.RELATIVE_PATH, MediaStore.MediaColumns.DATE_ADDED)
             val query = resolver.query(collection, columns,
                 "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND ${MediaStore.MediaColumns.IS_PENDING} = 0",
                 arrayOf("${Environment.DIRECTORY_DOWNLOADS}/MelKit/%"), null)
@@ -85,7 +85,7 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
                     val path = directory.removePrefix(prefix) + name
                     if (runCatching { ExportPaths.fileName(path) }.isFailure) continue
                     copies += SavedCopy(ContentUris.withAppendedId(collection, cursor.getLong(0)), name,
-                        path, cursor.getLong(2), cursor.getLong(3) * 1000)
+                        path, cursor.getLong(2), cursor.getLong(3) * 1000, cursor.getLong(5) * 1000)
                 }
             }
         } else {
@@ -113,7 +113,46 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
             }
             visit(root)
         }
-        return copies.sortedWith(compareByDescending<SavedCopy> { it.modified }.thenBy { it.name.lowercase(Locale.ROOT) })
+        return copies.sortedWith(compareByDescending<SavedCopy> { if (it.created > 0) it.created else it.modified }.thenBy { it.name.lowercase(Locale.ROOT) })
+    }
+
+    fun showDetails(copy: SavedCopy) { mutableState.update { it.copy(detail = copy) } }
+    fun dismissDetails() { mutableState.update { it.copy(detail = null) } }
+    fun requestDelete(copy: SavedCopy) { mutableState.update { it.copy(deleting = copy) } }
+    fun dismissDelete() { mutableState.update { it.copy(deleting = null) } }
+
+    fun share(activity: android.content.Context, copy: SavedCopy) {
+        try {
+            val uri = if (copy.uri.scheme == "file") androidx.core.content.FileProvider.getUriForFile(
+                activity, activity.packageName + ".sharefiles", File(requireNotNull(copy.uri.path))) else copy.uri
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).setType("application/octet-stream")
+                .putExtra(android.content.Intent.EXTRA_STREAM, uri).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            intent.clipData = android.content.ClipData.newRawUri(copy.name, uri)
+            activity.startActivity(android.content.Intent.createChooser(intent, null))
+        } catch (_: Exception) { mutableState.update { it.copy(issue = "read") } }
+    }
+
+    fun deleteConfirmed() {
+        val copy = mutableState.value.deleting ?: return
+        if (mutableState.value.busy || mutableState.value.copies.none { it.uri == copy.uri }) return
+        mutableState.update { it.copy(busy = true, deleting = null, detail = null, issue = null) }
+        viewModelScope.launch {
+            var deleted = false
+            try {
+                withContext(Dispatchers.IO) {
+                    if (copy.uri.scheme == "file") {
+                        @Suppress("DEPRECATION")
+                        val root = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MelKit").canonicalFile
+                        val file = File(requireNotNull(copy.uri.path)).canonicalFile
+                        check(file.path.startsWith(root.path + "/") && file.isFile && file.delete())
+                    } else check(resolver.delete(copy.uri, null, null) == 1)
+                }
+                deleted = true
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (_: Exception) { mutableState.update { it.copy(issue = "delete") }
+            } finally { mutableState.update { it.copy(busy = false) } }
+            if (deleted) refresh()
+        }
     }
 
     private fun openCopy(copy: SavedCopy): ParcelFileDescriptor = if (copy.uri.scheme == "file") {
@@ -157,7 +196,7 @@ class SavedCopiesViewModel(application: Application) : AndroidViewModel(applicat
                     restored = if (result.status == "ok") result.path else null,
                     conflict = if (result.status == "exists" && !asCopy) copy else null,
                     issue = if (result.status == "ok" || (result.status == "exists" && !asCopy)) null else result.status) }
-                if (result.status == "ok") library.connect()
+                if (result.status == "ok") { library.connect(); refresh() }
             }
             if (result.status == "ok") library.adBreak(com.spinel.melkit.ads.AdPlacement.RESTORE, publish)
             else publish()

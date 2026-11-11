@@ -66,8 +66,9 @@ class ModVaultViewModel : ViewModel() {
                 val response = library.toggleMod(entry).getString("status")
                 // Refresh even after an error: an interrupted move may leave a recoverable vault copy.
                 load(library, 0)
-                mutableState.update { if (response == "ok") it.copy(result = if (entry.id.isEmpty()) "disabled" else "enabled")
-                    else it.copy(issue = response) }
+                val publish = { mutableState.update { if (response == "ok") it.copy(result = if (entry.id.isEmpty()) "disabled" else "enabled")
+                    else it.copy(issue = response) } }
+                if (response == "ok") library.adBreak(com.spinel.melkit.ads.AdPlacement.MOD, publish) else publish()
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { mutableState.update { it.copy(issue = "incomplete") } }
             finally { mutableState.update { it.copy(busy = false) } }

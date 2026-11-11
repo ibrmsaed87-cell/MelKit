@@ -1,6 +1,9 @@
 package com.spinel.melkit.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -18,6 +21,9 @@ private val Colors = darkColorScheme(
     background = MelkitBackground,
     onBackground = Color(0xFFF1F5F1),
     surface = MelkitSurface,
+    surfaceContainer = MelkitSurface,
+    surfaceContainerHigh = Color(0xFF26322C),
+    surfaceContainerHighest = Color(0xFF2B3931),
     onSurface = Color(0xFFF1F5F1),
     surfaceVariant = Color(0xFF26322C),
     onSurfaceVariant = Color(0xFFB6C2B9),
@@ -27,5 +33,5 @@ private val Colors = darkColorScheme(
 
 @Composable
 fun MelKitTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Colors, typography = Typography(), content = content)
+    MaterialTheme(colorScheme = Colors, typography = Typography(), shapes = Shapes(extraSmall = RoundedCornerShape(16.dp), small = RoundedCornerShape(16.dp), medium = RoundedCornerShape(20.dp), large = RoundedCornerShape(24.dp)), content = content)
 }

@@ -29,6 +29,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Map
@@ -85,7 +90,7 @@ import java.util.Locale
 @Composable
 internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel, labels: Map<String, LibraryLabel>,
     organization: LibraryOrganizationViewModel, covers: LibraryCoversViewModel,
-    onOrganize: () -> Unit, onGuide: () -> Unit) {
+    onOrganize: () -> Unit, onShare: (GameEntry) -> Unit, onGuide: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
     val numbers = NumberFormat.getIntegerInstance(locale)
@@ -93,6 +98,9 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     var editingCover by rememberSaveable { mutableStateOf<String?>(null) }
     val coverRevision by covers.revision.collectAsState()
+    LaunchedEffect(state.connected, state.busy, state.path) {
+        if (state.connected && !state.busy && state.path.isEmpty()) model.refreshCounts()
+    }
     LaunchedEffect(state.path, state.offset) { listState.scrollToItem(0) }
     BackHandler(enabled = state.path.isNotEmpty() && state.connected && !state.busy && state.proof == null) {
         model.browse(state.path.substringBeforeLast('/', ""))
@@ -113,28 +121,16 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
             Text(stringResource(R.string.library_readonly_notice), color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = onOrganize) { Text(stringResource(R.string.categories)) }
         }
-        item {
-            Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(if (state.connected) R.string.library_connected else R.string.library_connect_title),
-                        fontWeight = FontWeight.Bold)
-                    Text(stringResource(if (state.connected) R.string.library_ready_body else R.string.library_connect_body),
-                        style = MaterialTheme.typography.bodyMedium)
-                    FilledTonalButton(onClick = model::connect, enabled = !state.busy) {
-                        if (state.busy) CircularProgressIndicator(Modifier.padding(end = 8.dp).size(18.dp), strokeWidth = 2.dp)
-                        Text(stringResource(when {
-                            state.busy -> R.string.library_working
-                            state.connected -> R.string.library_refresh
-                            else -> R.string.library_connect
-                        }))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { openShizuku(context) }) { Text(stringResource(R.string.open_shizuku)) }
-                        TextButton(onClick = onGuide) { Text(stringResource(R.string.library_help)) }
-                    }
+        if (!state.connected) item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.library_connect_body))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = model::connect, enabled = !state.busy) { Text(stringResource(R.string.library_connect)) }
+                    TextButton(onClick = onGuide) { Text(stringResource(R.string.library_help)) }
                 }
             }
         }
+        if (state.path.isEmpty()) item { ContentFolderGrid(state, model::browse) }
         state.issue?.let { issue ->
             item {
                 Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.errorContainer) {
@@ -164,14 +160,14 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            items(state.entries, key = { it.path }) { entry ->
+            items(if (state.path.isEmpty()) emptyList() else state.entries, key = { it.path }) { entry ->
                 val supported = entry.regular && NewFileRestore.supported(entry.path)
                 EntryCard(entry, labels[entry.path], state.connected && !state.busy, model, state.connected, state.previewRevision,
                     covers = covers, coverRevision = coverRevision,
                     onOrganize = if (supported) ({ editing = entry.path }) else null,
                     onCover = if (supported) ({ editingCover = entry.path }) else null,
                     onOpen = { model.browse(entry.path) },
-                    onRead = { model.verifyRead(entry) },
+                    onRead = { model.verifyRead(entry) }, onShare = { onShare(entry) },
                     onExport = {
                         if (model.prepareExport(entry)) {
                             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
@@ -241,7 +237,7 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
 private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, model: GameLibraryViewModel,
     connected: Boolean, previewRevision: Int, covers: LibraryCoversViewModel, coverRevision: Int,
     onOrganize: (() -> Unit)?, onCover: (() -> Unit)?, onOpen: () -> Unit,
-    onRead: () -> Unit, onExport: () -> Unit) {
+    onRead: () -> Unit, onShare: () -> Unit, onExport: () -> Unit) {
     val context = LocalContext.current
     val locale = ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH
     var showDetails by rememberSaveable(entry.path) { mutableStateOf(false) }
@@ -299,15 +295,12 @@ private fun EntryCard(entry: GameEntry, label: LibraryLabel?, enabled: Boolean, 
                         IconButton(onClick = { showActions = true }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Outlined.MoreVert, stringResource(R.string.file_actions))
                         }
-                        DropdownMenu(expanded = showActions, onDismissRequest = { showActions = false }) {
-                            DropdownMenuItem(text = { Text(stringResource(R.string.file_details)) },
-                                onClick = { showActions = false; showDetails = true })
-                            DropdownMenuItem(text = { Text(stringResource(R.string.library_read_test)) }, enabled = enabled,
-                                onClick = { showActions = false; onRead() })
-                            if (onOrganize != null) DropdownMenuItem(text = { Text(stringResource(R.string.organization_edit)) },
-                                enabled = enabled, onClick = { showActions = false; onOrganize() })
-                            if (onCover != null) DropdownMenuItem(text = { Text(stringResource(R.string.cover_edit)) },
-                                enabled = enabled, onClick = { showActions = false; onCover() })
+                        FileActionsMenu(showActions, { showActions = false }) {
+                            FileAction(R.string.file_details, Icons.Outlined.Info) { showActions = false; showDetails = true }
+                            FileAction(R.string.library_read_test, Icons.Outlined.Search, enabled) { showActions = false; onRead() }
+                            FileAction(R.string.share_other_apps, Icons.Outlined.Share, enabled) { showActions = false; onShare() }
+                            if (onOrganize != null) FileAction(R.string.organization_edit, Icons.Outlined.Edit, enabled) { showActions = false; onOrganize() }
+                            if (onCover != null) FileAction(R.string.cover_edit, Icons.Outlined.Image, enabled) { showActions = false; onCover() }
                         }
                     }
                 }

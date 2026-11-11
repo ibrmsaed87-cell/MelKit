@@ -48,7 +48,7 @@
     <string name="receive_hint">Scan the sender’s QR code</string>
     <string name="share_bundle">Content bundles</string>
     <string name="bundle_description">Collect selected mods, maps, saves, and worlds into one shareable bundle.</string>
-    <string name="bundle_choose">Choose files for a bundle</string>
+    <string name="bundle_choose">1 · Select bundle files</string>
     <string name="bundle_create">Create and save bundle</string>
     <string name="bundle_saved">The verified bundle was saved.</string>
     <string name="bundle_send_direct">Send bundle via MelKit</string>
@@ -56,9 +56,9 @@
     <string name="bundle_import">Open a MelKit bundle</string>
     <string name="bundle_verified">The bundle contents were verified.</string>
     <string name="bundle_contents">Bundle contents</string>
-    <string name="bundle_invalid">Choose a valid bundle created by MelKit.</string>
+    <string name="bundle_invalid">This ZIP is not a supported MelKit bundle, or contains invalid or unsafe entries. No game files were written.</string>
     <string name="bundle_checksum">File verification failed. Try another copy of the bundle.</string>
-    <string name="bundle_failed">MelKit could not complete the bundle operation. Check the selected files and try again.</string>
+    <string name="bundle_failed">The operation could not finish. An interrupted save may leave an incomplete ZIP at the selected location.</string>
     <string name="profiles_description">Create groups for cars, battles, and more. Switch groups while keeping essential mods enabled.</string>
     <string name="toggler">Mod switches</string>
     <string name="toggler_description">Move unused mods to a separate vault and restore them when needed, without downloading them again.</string>
@@ -350,7 +350,7 @@
     <string name="share_bad_qr">Scan a current sharing code created by MelKit.</string>
     <string name="share_checksum">File verification failed. Check the sender files and try a new transfer.</string>
     <string name="share_invalid_file">Choose up to 100 supported Melon files. Each can be up to 2 GiB, with up to 8 GiB per batch.</string>
-    <string name="share_duplicate_path">Choose one file per destination path.</string>
+    <string name="share_duplicate_path">Duplicate file names or paths were found. Review the selection or bundle.</string>
     <string name="share_source_access">A selected file changed or could not be read. Reconnect the source and select it again.</string>
     <string name="share_already_received">This batch is already saved. Open Received files.</string>
     <string name="share_game_missing">Melon Sandbox could not be opened on this phone.</string>
@@ -396,6 +396,37 @@
     <string name="bulk_failed">Could not restore this file</string>
     <string name="bulk_finished_message">Restored %1$d · Skipped %2$d · Could not complete %3$d · Not attempted %4$d</string>
     <string name="bulk_retry_hint">Files that could not be completed or were not attempted remain selected for retry.</string>
+    <string name="worlds">Worlds</string>
+    <string name="content_file_count">%1$d files</string>
+    <string name="view_backup">View backup</string>
+    <string name="delete_file_confirm">Delete %1$s from its saved location? This cannot be undone.</string>
+    <string name="file_delete_failed">Could not delete the file. Check access and try again.</string>
+    <string name="operation_in_progress">An operation is in progress. Please wait; a restore batch can stop after the current file.</string>
+    <string name="profile_body_short">Choose the mods for each group. Core mods stay enabled when you switch.</string>
+    <string name="bundle_review">2 · Review bundle</string>
+    <string name="bundle_review_help">Name the ZIP and review its files. Add an optional cover, then choose where to save it.</string>
+    <string name="bundle_name">Bundle name</string>
+    <string name="bundle_edit_selection">Edit selection</string>
+    <string name="bundle_save_zip">3 · Save ZIP</string>
+    <string name="my_saved_bundles">My Saved Bundles</string>
+    <string name="no_saved_bundles">New bundles you create will appear here. Older ZIP files can still be opened using Open MelKit Bundle.</string>
+    <string name="bundle_rename">Rename bundle</string>
+    <string name="bundle_temporary_access">This provider did not grant lasting access. You may need to select the ZIP again after restarting.</string>
+    <string name="bundle_unavailable">This ZIP is missing, moved, or no longer accessible. Use Open MelKit Bundle to select it again.</string>
+    <string name="bundle_catalog_error">Could not read or update the saved-bundle list. A ZIP already saved remains in its chosen location; open it manually.</string>
+    <string name="bundle_rename_failed">Could not rename this document. Use a valid name and check whether its provider supports renaming.</string>
+    <string name="bundle_file_exists">Already in the game: skipped by default.</string>
+    <string name="bundle_file_new">No file at this game path was found during review.</string>
+    <string name="bundle_file_unchecked">Game destination could not be checked. Import will check again and skip existing files.</string>
+    <string name="bundle_content_invalid">The known file structure is invalid or empty. Import is disabled for this file.</string>
+    <string name="bundle_content_unknown">This content format could not be fully checked. It is not classified as corrupt.</string>
+    <string name="bundle_duplicate_content">Same content as %1$s. Review your selection.</string>
+    <string name="bundle_save_selected">Save selected to Downloads</string>
+    <string name="bundle_share_selected">Share selected</string>
+    <string name="bundle_download_ok">Saved and verified in Download/MelKit.</string>
+    <string name="bundle_download_report">Downloads: %1$d saved, %2$d failed. See each file for its result.</string>
+    <string name="backup_created">Created: %1$s</string>
+    <string name="backup_modified">Modified: %1$s</string>
 </resources>
 
 

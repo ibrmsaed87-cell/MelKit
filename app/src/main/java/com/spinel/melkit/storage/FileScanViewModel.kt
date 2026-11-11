@@ -140,8 +140,13 @@ class FileScanViewModel : ViewModel() {
             } else if (token != null) {
                 val response = library.scanFiles("quarantine", JSONObject().put("token", token)
                     .put("indices", JSONArray(request.indices)))
-                mutableState.update { it.copy(moved = response.optInt("moved"), scan = null, selection = emptySet(), vault = null) }
+                val moved = response.optInt("moved")
+                mutableState.update { it.copy(moved = if (response.optString("status") == "ok") 0 else moved,
+                    scan = null, selection = emptySet(), vault = null) }
                 checked(response)
+                val publish = { mutableState.update { it.copy(moved = moved) } }
+                if (moved == request.indices.size && request.indices.isNotEmpty()) library.adBreak(com.spinel.melkit.ads.AdPlacement.CLEAN, publish)
+                else publish()
             }
         }
     }

@@ -44,7 +44,7 @@
     <string name="receive_hint">امسح رمز الاقتران من هاتف المرسل</string>
     <string name="share_bundle">حزم المحتوى</string>
     <string name="bundle_description">اجمع المودات والخرائط وملفات الحفظ والعوالم التي تختارها في حزمة واحدة للمشاركة.</string>
-    <string name="bundle_choose">اختيار ملفات الحزمة</string>
+    <string name="bundle_choose">١ · اختيار ملفات الحزمة</string>
     <string name="bundle_create">إنشاء الحزمة وحفظها</string>
     <string name="bundle_saved">حُفظت الحزمة بعد التحقق منها.</string>
     <string name="bundle_send_direct">إرسال الحزمة عبر MelKit</string>
@@ -52,9 +52,9 @@
     <string name="bundle_import">فتح حزمة MelKit</string>
     <string name="bundle_verified">تم التحقق من محتويات الحزمة.</string>
     <string name="bundle_contents">محتويات الحزمة</string>
-    <string name="bundle_invalid">اختر حزمة صالحة أنشأها MelKit.</string>
+    <string name="bundle_invalid">ملف ZIP ليس حزمة MelKit مدعومة، أو يحتوي على عناصر غير صالحة أو مسارات غير آمنة. لم يُكتب أي ملف داخل اللعبة.</string>
     <string name="bundle_checksum">تعذّر التحقق من الملفات. جرّب نسخة أخرى من الحزمة.</string>
-    <string name="bundle_failed">تعذّر إكمال العملية. تحقّق من الملفات المحددة وحاول مجددًا.</string>
+    <string name="bundle_failed">تعذر إكمال العملية. قد يترك انقطاع الحفظ ملف ZIP غير مكتمل في المكان المختار.</string>
     <string name="profiles_description">أنشئ مجموعات للسيارات والحروب وغيرها، وبدّل بينها مع إبقاء المودات الأساسية مفعّلة.</string>
     <string name="toggler">تفعيل المودات وتعطيلها</string>
     <string name="toggler_description">انقل المودات غير المستخدمة إلى خزنة منفصلة، وأعدها عند الحاجة دون تنزيلها مجددًا.</string>
@@ -343,7 +343,7 @@
     <string name="share_bad_qr">امسح رمز مشاركة صالحًا أنشأه MelKit.</string>
     <string name="share_checksum">تعذّر التحقق من الملفات. راجع ملفات المرسل وابدأ نقلًا جديدًا.</string>
     <string name="share_invalid_file">اختر حتى 100 ملف مدعوم للعبة Melon. الحد لكل ملف 2 غيغابايت ثنائية، وللدفعة 8.</string>
-    <string name="share_duplicate_path">اختر ملفًا واحدًا لكل مسار وجهة.</string>
+    <string name="share_duplicate_path">عُثر على أسماء أو مسارات ملفات مكررة. راجع الاختيار أو الحزمة.</string>
     <string name="share_source_access">تغيّر ملف محدد أو تعذّرت قراءته. أعد ربط المصدر وحدده مجددًا.</string>
     <string name="share_already_received">هذه الدفعة محفوظة بالفعل. افتح الملفات المستلمة.</string>
     <string name="share_game_missing">تعذّر فتح Melon Sandbox على هذا الهاتف.</string>
@@ -389,6 +389,37 @@
     <string name="bulk_failed">تعذرت استعادة هذا الملف</string>
     <string name="bulk_finished_message">استُعيدت %1$d · تم تجاوز %2$d · تعذر إكمال %3$d · لم تبدأ استعادة %4$d</string>
     <string name="bulk_retry_hint">تبقى الملفات المتعذرة والتي لم تبدأ استعادتها محددة لإعادة المحاولة.</string>
+    <string name="worlds">العوالم</string>
+    <string name="content_file_count">%1$d ملف</string>
+    <string name="view_backup">عرض النسخة</string>
+    <string name="delete_file_confirm">هل تريد حذف %1$s من مكان حفظه؟ لا يمكن التراجع عن الحذف.</string>
+    <string name="file_delete_failed">تعذر حذف الملف. تحقق من صلاحية الوصول وحاول مجددًا.</string>
+    <string name="operation_in_progress">توجد عملية جارية. انتظر اكتمالها؛ يمكن إيقاف الاستيراد الجماعي بعد الملف الجاري.</string>
+    <string name="profile_body_short">اختر مودات كل مجموعة. تبقى المودات الأساسية مفعّلة عند التبديل.</string>
+    <string name="bundle_review">٢ · مراجعة الحزمة</string>
+    <string name="bundle_review_help">سمّ الحزمة وراجع ملفاتها، وأضف غلافًا اختياريًا، ثم اختر مكان حفظ ZIP.</string>
+    <string name="bundle_name">اسم الحزمة</string>
+    <string name="bundle_edit_selection">تعديل الاختيار</string>
+    <string name="bundle_save_zip">٣ · حفظ ZIP</string>
+    <string name="my_saved_bundles">حزمي المحفوظة</string>
+    <string name="no_saved_bundles">ستظهر هنا الحزم الجديدة التي تنشئها. يمكنك فتح ملفات ZIP القديمة من زر فتح حزمة MelKit.</string>
+    <string name="bundle_rename">إعادة تسمية الحزمة</string>
+    <string name="bundle_temporary_access">لم يمنح موفر الملفات وصولًا دائمًا. قد تحتاج إلى اختيار ZIP مجددًا بعد إعادة التشغيل.</string>
+    <string name="bundle_unavailable">ملف ZIP محذوف أو منقول أو تعذر الوصول إليه. اختره مجددًا من فتح حزمة MelKit.</string>
+    <string name="bundle_catalog_error">تعذر قراءة قائمة الحزم أو تحديثها. إذا اكتمل حفظ ZIP فهو باقٍ في المكان المختار؛ افتحه يدويًا.</string>
+    <string name="bundle_rename_failed">تعذرت إعادة التسمية. استخدم اسمًا صالحًا وتحقق من دعم موفر الملفات لإعادة التسمية.</string>
+    <string name="bundle_file_exists">موجود داخل اللعبة: سيُتخطى افتراضيًا.</string>
+    <string name="bundle_file_new">لم يُعثر على ملف في هذا المسار داخل اللعبة أثناء المراجعة.</string>
+    <string name="bundle_file_unchecked">تعذر فحص وجهة اللعبة. سيتحقق الاستيراد مجددًا ويتخطى الملفات الموجودة.</string>
+    <string name="bundle_content_invalid">بنية الملف المعروفة غير سليمة أو فارغة. استيراد هذا الملف غير متاح.</string>
+    <string name="bundle_content_unknown">تعذر التحقق الكامل من صيغة المحتوى؛ لا يُصنف الملف تالفًا.</string>
+    <string name="bundle_duplicate_content">محتوى مطابق للملف %1$s. راجع اختيارك.</string>
+    <string name="bundle_save_selected">حفظ المحدد في التنزيلات</string>
+    <string name="bundle_share_selected">مشاركة المحدد</string>
+    <string name="bundle_download_ok">تم الحفظ والتحقق داخل Download/MelKit.</string>
+    <string name="bundle_download_report">التنزيلات: %1$d ناجح، %2$d فاشل. راجع نتيجة كل ملف.</string>
+    <string name="backup_created">تاريخ الإنشاء: %1$s</string>
+    <string name="backup_modified">تاريخ التعديل: %1$s</string>
 </resources>
 
 

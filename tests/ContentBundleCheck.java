@@ -99,6 +99,13 @@ public final class ContentBundleCheck {
             forged(forged, savePath, save, digest, true);
             rejects("INVALID_BUNDLE", () -> ContentBundle.unpack(forged.toFile(), invalid.toFile()));
 
+            try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(forged))) {
+                zip.putNextEntry(new ZipEntry("Saves/Same.melsave")); zip.write(save); zip.closeEntry();
+                zip.putNextEntry(new ZipEntry("saves/same.melsave")); zip.write(save); zip.closeEntry();
+            }
+            rejects("DUPLICATE_NAME", () -> ContentBundle.unpack(forged.toFile(), invalid.toFile()));
+            check(!Files.exists(invalid), "Duplicate archive names leave no extracted files");
+
             rejects("INVALID_FILE", () -> ContentBundle.write(archive.toFile(), List.of(
                     source(savePath, save.length, save), source("saves/save.melsave", save.length, save))));
             rejects("FILE_CHANGED", () -> ContentBundle.write(archive.toFile(), List.of(source(savePath, save.length + 1, save))));

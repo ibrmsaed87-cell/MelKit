@@ -11,8 +11,8 @@ fun signingValue(name: String): String? = System.getenv(name)?.takeIf { it.isNot
 val releaseKeyPath = signingValue("MELKIT_KEYSTORE_PATH")
 val configuredVersionCode = providers.environmentVariable("MELKIT_VERSION_CODE")
     .map { it.toInt() }.getOrElse(1)
-// Signed phone-test builds use Google's test units until live serving is explicitly enabled.
-val liveAds = providers.environmentVariable("MELKIT_LIVE_ADS").orElse("false").map {
+// Production release uses the verified MelKit units. CI explicitly selects test units for phone-test APKs.
+val liveAds = providers.environmentVariable("MELKIT_LIVE_ADS").orElse("true").map {
     require(it == "true" || it == "false") { "MELKIT_LIVE_ADS must be true or false" }
     it == "true"
 }.get()
@@ -44,6 +44,7 @@ android {
     }
 
     buildTypes {
+        debug { buildConfigField("boolean", "TEST_ADS", "true") }
         release {
             signingConfig = signingConfigs.getByName("permanentRelease")
             isMinifyEnabled = true

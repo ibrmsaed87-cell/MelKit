@@ -32,7 +32,7 @@ import java.lang.ref.WeakReference
 
 enum class AdPlacement(vararg val routes: String) {
     BACKUP("library", "share"), RESTORE("backups", "bundles", "share"),
-    BUNDLE("bundles", "share"), PROFILE("profiles"), SCAN("scanner")
+    BUNDLE("bundles", "share"), PROFILE("profiles"), MOD("toggles"), CLEAN("scanner"), SCAN("scanner")
 }
 
 /** Main-thread coordinator. Ads never own or retry a file transaction. */

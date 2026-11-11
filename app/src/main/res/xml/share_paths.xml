@@ -2,4 +2,6 @@
 <paths>
     <files-path name="received" path="share-received/" />
     <cache-path name="application" path="share-app/" />
+    <cache-path name="content" path="share-content/" />
+    <external-path name="saved" path="Download/MelKit/" />
 </paths>

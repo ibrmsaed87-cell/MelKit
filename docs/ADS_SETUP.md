@@ -18,11 +18,15 @@ No Analytics, banner, native or rewarded SDK integration is added.
 
 ## Test serving and release serving
 
-`MELKIT_LIVE_ADS` defaults to `false`. Consequently signed phone-test builds
-use Google's dedicated test units, including Release builds. Live IDs remain
-configured for a later release build explicitly using `MELKIT_LIVE_ADS=true`.
-Unexpected values fail Gradle configuration. The AdMob application ID is the
-real app ID so UMP can fetch this app's configured privacy messages.
+Production Gradle Release configuration defaults `MELKIT_LIVE_ADS=true`, selecting
+the verified MelKit unit IDs above. Debug overrides `TEST_ADS=true`. The existing
+GitLab build script explicitly exports `MELKIT_LIVE_ADS=false` for APK-only phone
+tests; an authorized `BUILD_AAB=true` release defaults it to true. Either mode
+can be explicitly overridden with the existing variable. Unexpected values fail
+Gradle configuration. The real AdMob application ID is retained for UMP.
+No live requests, phone tests, builds or pipelines were run for the November 11
+source changes. Never repeatedly test a live build; use the APK test mode first.
+
 The build report records `Live AdMob units: true/false` so a phone-test artifact
 and a production artifact can be distinguished before distribution.
 
@@ -64,7 +68,9 @@ or building. Never bring back the old Git ignore exception or its tracked file.
   cannot discard the minimum gap between formats.
 - Opportunities are after verified backup/export, saved/received-file restore,
   fully successful batch restore, verified bundle creation, successful profile
-  application, and explicit scan completion, before publishing their results.
+  application, verified individual mod enable/disable, fully completed explicit
+  quarantine, and explicit scan completion, before publishing their results.
+  A complete successful selected-download batch is one opportunity as well.
 - Failed, conflicted, cancelled or partially restored batches do not create an
   opportunity. Pagination, navigation, Back, setup, settings and ad dismissal
   are not tasks. Profile undo/delete and network-transfer completion are not
@@ -196,3 +202,12 @@ revenue and continued use after release before changing these settings.
 - https://support.google.com/admob/answer/6201362
 - https://support.google.com/admob/answer/9341964
 - https://support.google.com/admob/answer/10113207
+
+## November 11 source review
+
+The package, two unit IDs, UMP gating, 50-second gap, two-action guard, 3/5-minute
+interstitial cap and 1/10-minute app-open cap are retained. Additional successful
+tasks use the same coordinator; they do not change vault/quarantine file engines.
+Failed and partial operations have no new ad opportunity. Transfer and consent
+still block presentation. Regional consent delivery remains a device/dashboard
+validation item; no manual language/country bypass was added.

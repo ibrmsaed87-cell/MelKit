@@ -58,7 +58,7 @@ enum class LibraryIssue {
 data class ReadProof(val name: String, val bytes: Long, val sha256: String, val exported: Boolean,
     val savedPath: String? = null)
 
-data class LibraryCounts(val mods: Int, val maps: Int, val saves: Int)
+data class LibraryCounts(val mods: Int, val maps: Int, val saves: Int, val worlds: Int)
 data class RestoreOutcome(val status: String, val path: String? = null)
 
 data class GameLibraryState(
@@ -160,6 +160,30 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun refreshConnection() {
+        if (mutableState.value.busy) return
+        if (mutableState.value.connected && remote?.asBinder()?.pingBinder() != true) disconnected()
+        if (!mutableState.value.connected && runCatching {
+            Shizuku.pingBinder() && !Shizuku.isPreV11() &&
+                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        }.getOrDefault(false)) bind()
+    }
+
+    /** Advisory only; restoreFile still makes the authoritative exclusive-create check. */
+    suspend fun existingContent(paths: List<String>): Map<String, String> = withContext(Dispatchers.IO) {
+        val service = remote
+        paths.associateWith { path ->
+            if (service == null || !state.value.connected) "unknown" else runCatching {
+                val info = JSONObject(service.info(storageRoot, path))
+                when {
+                    info.optString("status") == "ok" && info.has("path") -> "exists"
+                    info.optString("status") == "missing" -> "new"
+                    else -> "unknown"
+                }
+            }.getOrDefault("unknown")
+        }
+    }
+
     fun dismissConnectionNotice() { mutableState.update { it.copy(connectionNotice = null) } }
 
     private fun bind() {
@@ -198,8 +222,8 @@ class GameLibraryViewModel(application: Application) : AndroidViewModel(applicat
             mutableState.update { it.copy(counts = null, countsLoading = true, countsIssue = null) }
             try {
                 val result = withContext(Dispatchers.IO) { checked(service.contentCounts(storageRoot)) }
-                val counts = LibraryCounts(result.getInt("mods"), result.getInt("maps"), result.getInt("saves"))
-                require(counts.mods >= 0 && counts.maps >= 0 && counts.saves >= 0)
+                val counts = LibraryCounts(result.getInt("mods"), result.getInt("maps"), result.getInt("saves"), result.getInt("worlds"))
+                require(counts.mods >= 0 && counts.maps >= 0 && counts.saves >= 0 && counts.worlds >= 0)
                 mutableState.update { it.copy(counts = counts, countsLoading = false) }
             } catch (cancelled: CancellationException) {
                 throw cancelled

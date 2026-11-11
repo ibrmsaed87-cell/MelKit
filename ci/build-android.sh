@@ -65,6 +65,9 @@ if (( MELKIT_VERSION_CODE < 1 || MELKIT_VERSION_CODE > 2100000000 )); then
   exit 1
 fi
 
+# APK-only runs stay in test mode; an authorized AAB release defaults to verified live units.
+export MELKIT_LIVE_ADS="${MELKIT_LIVE_ADS:-${BUILD_AAB:-false}}"
+
 # The Android module uses the signing/version environment variables above.
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$CI_PROJECT_DIR/.gradle}"
 bash ci/check-content-paths.sh

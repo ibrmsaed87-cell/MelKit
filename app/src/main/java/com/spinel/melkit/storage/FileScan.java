@@ -170,6 +170,17 @@ public final class FileScan {
         if (!file.isFile() || file.length() != item.bytes || file.lastModified() != item.modified) throw new ModVault.Changed();
     }
 
+    /** Same conservative container validation used by scanning; never modifies the source. */
+    public String inspectContent(String path) throws IOException {
+        File file = scoped(path);
+        if (!NewFileRestore.supported(path)) return "unsupported";
+        if (!file.isFile()) return "unreadable";
+        if (file.length() == 0) return "empty";
+        String lower = path.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".melmod") || lower.endsWith(".melsave")
+                ? inspectJson(file, file.length()) : inspectZip(file);
+    }
+
     private String inspectJson(File file, long size) throws IOException {
         if (size > MAX_JSON_BYTES) return "limit";
         byte[] bytes = new byte[(int) size];

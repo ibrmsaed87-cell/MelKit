@@ -23,6 +23,9 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,12 +57,15 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val context = LocalContext.current
     val pageState by model.state.collectAsState()
     val transfer by model.transfer.collectAsState()
+    val savedBundles by model.savedBundles.collectAsState()
+    var bulkSavePending by remember { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(if (bundles) "bundle_menu" else "menu") }
     var source by rememberSaveable { mutableStateOf("game") }
     var pending by rememberSaveable { mutableStateOf("") }
     var editingCover by rememberSaveable { mutableStateOf(false) }
     var restore by remember { mutableStateOf<ReceivedFile?>(null) }
     var confirmBatch by remember { mutableStateOf(false) }
+    var details by remember { mutableStateOf<ReceivedFile?>(null) }
     var save by remember { mutableStateOf<ReceivedFile?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.saved_location, pageState.savedPath.orEmpty())
@@ -126,7 +132,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     }
     val bundleDestination = if (bundles) {
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-            uri?.let(model::saveBundle)
+            if (uri != null) model.saveBundle(uri) else model.issue("CANCELLED")
         }
     } else null
     val bundleSource = if (bundles) {
@@ -140,7 +146,9 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val writeStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         val file = save
         save = null
-        if (allowed && file != null) model.save(file) else if (!allowed) model.issue("STORAGE_PERMISSION")
+        if (allowed && bulkSavePending) model.saveSelected()
+        else if (allowed && file != null) model.save(file) else if (!allowed) model.issue("STORAGE_PERMISSION")
+        bulkSavePending = false
     }
     LaunchedEffect(transfer.phase) {
         if (!bundles) {
@@ -149,7 +157,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
         }
     }
     LaunchedEffect(pageState.bundleUri) {
-        if (bundles && pageState.bundleUri != null && page == "pick") page = "bundle_ready"
+        if (bundles && pageState.bundleUri != null && page == "review") page = "bundle_ready"
     }
     LaunchedEffect(pageState.bundleBatch) {
         if (bundles && pageState.bundleBatch != null) page = "contents"
@@ -164,7 +172,13 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val returnPage = if (!bundles && page == "contents") "history" else entryPage
     BackHandler(enabled = page != entryPage && !transfer.active && !pageState.busy) {
         model.clearFeedback()
-        page = returnPage
+        page = if (page == "review") "pick" else returnPage
+    }
+    LaunchedEffect(connection.path, connection.connected, connection.busy) {
+        if (connection.connected && !connection.busy && connection.path.isEmpty()) library.refreshCounts()
+    }
+    LaunchedEffect(pageState.received, pageState.bundleBatch, connection.connected) {
+        if (pageState.bundleBatch != null) model.inspectBundle(library)
     }
 
     val screen = when {
@@ -176,6 +190,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val bundleFiles = if (screen == "contents") pageState.received.filter {
         it.batch == pageState.bundleBatch && ShareWire.validPath(it.path)
     } else emptyList()
+    val eligibleCount = bundleFiles.count { pageState.contentWarnings[it.path] !in listOf("invalid", "empty") }
     val selectedCount = bundleFiles.count { it.path in pageState.restoreSelection }
     val batch = pageState.batchRestore
     val outcomes = batch?.entries?.associateBy { it.path }.orEmpty()
@@ -195,7 +210,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(start = 20.dp, end = 20.dp,
                 top = 16.dp, bottom = when {
                     restoreToolbar && batch != null && !batch.finished -> 160.dp
-                    screen == "pick" || restoreToolbar -> 100.dp
+                    screen == "pick" || restoreToolbar -> 210.dp
                     else -> 20.dp
                 }),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -205,6 +220,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         "history" -> R.string.share_received_files
                         "contents" -> R.string.bundle_contents
                         "transfer" -> R.string.share_transfer
+                        "review" -> R.string.bundle_review
                         "bundle_ready" -> R.string.bundle_ready
                         "bundle_menu" -> R.string.share_bundle
                         else -> R.string.sharing
@@ -243,6 +259,39 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                 }
                             }
                         }
+                        item { Text(stringResource(R.string.my_saved_bundles), style = MaterialTheme.typography.titleLarge) }
+                        if (savedBundles.isEmpty()) item { Text(stringResource(R.string.no_saved_bundles)) }
+                        items(savedBundles, key = { "catalog:" + it.id }) { item -> SavedBundleCard(item, model, !pageState.busy) }
+                    }
+                    "review" -> {
+                        item {
+                            ShareCard(R.string.bundle_review, R.string.bundle_review_help) {
+                                OutlinedTextField(value = pageState.draftName, onValueChange = model::bundleName,
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true, enabled = !pageState.busy,
+                                    label = { Text(stringResource(R.string.bundle_name)) })
+                                Text(stringResource(R.string.content_file_count, pageState.queue.size))
+                                Text(pageState.queue.map { stringResource(contentTypeLabel(it.path)) }.distinct().joinToString(" · "))
+                                pageState.draftCover?.let { CoverPreview(it, Modifier.size(96.dp)) }
+                                OutlinedButton(enabled = !pageState.busy, onClick = { editingCover = true }) { Text(stringResource(R.string.cover_edit)) }
+                                OutlinedButton(enabled = !pageState.busy, onClick = { page = "pick" }) { Text(stringResource(R.string.bundle_edit_selection)) }
+                                FilledTonalButton(modifier = Modifier.fillMaxWidth(),
+                                    enabled = !pageState.busy && pageState.queue.isNotEmpty() && pageState.draftName.trim().isNotEmpty() &&
+                                        pageState.draftName.none { it == '/' || it == '\\' || it.code < 32 },
+                                    onClick = { bundleDestination?.launch(pageState.draftName.trim().removeSuffix(".zip") + ".zip") }) {
+                                    Text(stringResource(R.string.bundle_save_zip))
+                                }
+                            }
+                        }
+                        items(pageState.queue, key = { "review:" + it.path }) { file ->
+                            ShareCard(null, null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    SharePath(file.path, Modifier.weight(1f))
+                                    IconButton(enabled = !pageState.busy, onClick = { model.remove(file.path) }) {
+                                        Icon(Icons.Outlined.Close, stringResource(R.string.share_remove))
+                                    }
+                                }
+                            }
+                        }
                     }
                     "bundle_ready" -> {
                         if (pageState.bundleStatus == "saved" && pageState.issue == null) item {
@@ -274,13 +323,13 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         item {
                             ShareCard(R.string.share_direct, R.string.sharing_description) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilledTonalButton(enabled = !pageState.busy, onClick = {
+                                    FilledTonalButton(modifier = Modifier.weight(1f), enabled = !pageState.busy, onClick = {
                                         model.reset(clearQueue = true)
                                         source = "game"
                                         if (connection.connected && !connection.busy) library.browse("")
                                         page = "pick"
                                     }) { Text(stringResource(R.string.send)) }
-                                    FilledTonalButton(enabled = !pageState.busy, onClick = {
+                                    FilledTonalButton(modifier = Modifier.weight(1f), enabled = !pageState.busy, onClick = {
                                         model.reset(clearQueue = false)
                                         begin("receive")
                                     }) { Text(stringResource(R.string.receive)) }
@@ -290,14 +339,14 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         }
                         item {
                             ShareCard(R.string.share_app_apk, R.string.share_app_apk_body) {
-                                FilledTonalButton(enabled = !pageState.busy, onClick = { model.shareApk(context) }) {
+                                OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = { model.shareApk(context) }) {
                                     Text(stringResource(R.string.share_app_apk))
                                 }
                             }
                         }
                         item {
                             ShareCard(R.string.share_project_link, R.string.share_project_body) {
-                                FilledTonalButton(enabled = !pageState.busy, onClick = { model.shareLink(context) }) {
+                                OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = { model.shareLink(context) }) {
                                     Text(stringResource(R.string.share_project_link))
                                 }
                             }
@@ -321,12 +370,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                             Text(stringResource(R.string.share_review_selection))
                                         }
                                     }
-                                    if (bundles) Row(verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        pageState.draftCover?.let { CoverPreview(it, Modifier.size(64.dp)) }
-                                        OutlinedButton(enabled = !pageState.busy, onClick = { editingCover = true }) {
-                                            Text(stringResource(R.string.cover_edit))
-                                        }
+                                    TextButton(enabled = !pageState.busy && pageState.queue.isNotEmpty(), onClick = model::clearSelection) {
+                                        Text(stringResource(R.string.bulk_deselect_all))
                                     }
                                     OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
                                         model.clearFeedback()
@@ -367,7 +412,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                     if (connection.issue != null) Text(stringResource(R.string.share_source_access))
                                     else if (connection.loaded && connection.entries.isEmpty()) Text(stringResource(R.string.share_empty_source))
                                 }
-                                items(connection.entries.filter { it.directory || (it.regular && ShareWire.validPath(it.path) && it.size > 0) },
+                                if (connection.path.isEmpty()) item { ContentFolderGrid(connection, library::browse) }
+                                items(connection.entries.filter { connection.path.isNotEmpty() && (it.directory || (it.regular && ShareWire.validPath(it.path) && it.size > 0)) },
                                     key = { "game:" + it.path }) { entry ->
                                     if (entry.directory) OutlinedCard(enabled = !connection.busy, onClick = {
                                         model.clearFeedback(); library.browse(entry.path)
@@ -416,11 +462,13 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                 }
                                 transfer.ticket?.let { ticket ->
                                     val image = remember(ticket) { runCatching { makeQr(ticket.encode()) }.getOrNull() }
-                                    if (image != null) Image(image.asImageBitmap(), stringResource(R.string.share_scan_prompt),
-                                        Modifier.widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f).background(Color.White))
+                                    if (image != null) Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+                                        Image(image.asImageBitmap(), stringResource(R.string.share_scan_prompt),
+                                            Modifier.padding(16.dp).widthIn(max = 320.dp).fillMaxWidth().aspectRatio(1f))
+                                    }
                                     else ShareError("BAD_QR")
                                 }
-                                transfer.progress?.let { p ->
+                                transfer.progress?.takeIf { it.total > 0 }?.let { p ->
                                     val percent = if (transfer.phase == "complete") 100 else (p.bytes * 100 / p.total).toInt().coerceAtMost(99)
                                     LinearProgressIndicator(progress = { percent / 100f }, modifier = Modifier.fillMaxWidth())
                                     Text(stringResource(R.string.share_progress, percent, p.index, p.count))
@@ -433,17 +481,13 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                         Text(stringResource(R.string.share_bundle))
                                     }
                                 } else if (!transfer.active && !bundles) {
-                                    if (transfer.sending && pageState.queue.isNotEmpty() && transfer.phase != "complete") {
-                                        TextButton(onClick = { model.reset(clearQueue = false); page = "pick" }) {
-                                            Text(stringResource(R.string.share_choose))
-                                        }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        FilledTonalButton(modifier = Modifier.weight(1f), onClick = { model.reset(clearQueue = true); source = "game"; if (connection.connected) library.browse(""); page = "pick" }) { Text(stringResource(R.string.send)) }
+                                        FilledTonalButton(modifier = Modifier.weight(1f), onClick = { model.reset(clearQueue = true); page = "menu"; begin("receive") }) { Text(stringResource(R.string.receive)) }
                                     }
-                                    FilledTonalButton(onClick = { page = "history" }) { Text(stringResource(R.string.share_received_files)) }
-                                    TextButton(onClick = { model.reset(clearQueue = false); page = "menu"; begin("receive") }) {
-                                        Text(stringResource(R.string.share_receive_next))
-                                    }
-                                    TextButton(onClick = { model.reset(clearQueue = false); page = "menu" }) {
-                                        Text(stringResource(R.string.sharing))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(modifier = Modifier.weight(1f), onClick = { model.reset(clearQueue = true); page = "history" }) { Text(stringResource(R.string.share_received_files)) }
+                                        OutlinedButton(modifier = Modifier.weight(1f), onClick = { model.reset(clearQueue = true); page = "menu" }) { Text(stringResource(R.string.sharing)) }
                                     }
                                 }
                             }
@@ -461,12 +505,16 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                             ShareCard(null, null) {
                                 Text(stringResource(R.string.bulk_selected_count, selectedCount), fontWeight = FontWeight.Bold)
                                 OutlinedButton(enabled = !pageState.busy, onClick = model::selectAllForRestore) {
-                                    Text(stringResource(if (selectedCount == bundleFiles.size) R.string.bulk_deselect_all
+                                    Text(stringResource(if (selectedCount > 0 && selectedCount == eligibleCount) R.string.bulk_deselect_all
                                         else R.string.bulk_select_all))
                                 }
                                 Text(stringResource(R.string.bulk_existing_help), style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                        }
+                        if (screen == "contents" && pageState.exportResults.isNotEmpty()) item {
+                            val done = pageState.exportResults.count { it.value == "ok" }
+                            ShareNotice(stringResource(R.string.bundle_download_report, done, pageState.exportResults.size - done))
                         }
                         if (screen == "contents" && batch != null) item {
                             RestoreBatchSummary(batch)
@@ -501,10 +549,25 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                             ShareCard(null, null) {
                                 val archive = ShareWire.validBundlePath(file.path)
                                 if (screen == "contents" && !archive) {
-                                    PickShareRow(file.path, file.path in pageState.restoreSelection, !pageState.busy) {
+                                    PickShareRow(file.path, file.path in pageState.restoreSelection, !pageState.busy && pageState.contentWarnings[file.path] !in listOf("invalid", "empty")) {
                                         model.selectForRestore(file.path)
                                     }
+                                    Text(stringResource(contentTypeLabel(file.path)), style = MaterialTheme.typography.bodySmall)
+                                    Text(stringResource(when (pageState.preflight[file.path]) {
+                                        "exists" -> R.string.bundle_file_exists
+                                        "new" -> R.string.bundle_file_new
+                                        else -> R.string.bundle_file_unchecked
+                                    }), style = MaterialTheme.typography.bodySmall)
+                                    pageState.contentWarnings[file.path]?.takeIf { it != "ok" }?.let { warning ->
+                                        Text(stringResource(when (warning) {
+                                            "invalid", "empty" -> R.string.bundle_content_invalid
+                                            "unreadable" -> R.string.share_source_access
+                                            else -> R.string.bundle_content_unknown
+                                        }), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    pageState.duplicateContent[file.path]?.let { original -> Text(stringResource(R.string.bundle_duplicate_content, original), style = MaterialTheme.typography.bodySmall) }
                                     outcomes[file.path]?.let { outcome -> RestoreFileResult(outcome) }
+                                    pageState.exportResults[file.path]?.let { status -> Text(stringResource(if (status == "ok") R.string.bundle_download_ok else shareErrorText(status, true))) }
                                 } else SharePath(if (archive) file.file.name else file.path)
                                 Text(Formatter.formatFileSize(context, file.bytes))
                                 if (archive) {
@@ -512,6 +575,22 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                         model.openReceivedBundle(file)
                                         page = "contents"
                                     }) { Text(stringResource(R.string.bundle_open_received)) }
+                                } else if (screen == "contents") {
+                                    var actions by remember(file.path) { mutableStateOf(false) }
+                                    Box {
+                                        IconButton(enabled = !pageState.busy, onClick = { actions = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.file_actions)) }
+                                        FileActionsMenu(actions, { actions = false }) {
+                                            FileAction(R.string.file_details, Icons.Outlined.Info) { actions = false; details = file }
+                                            FileAction(R.string.share_import, Icons.Outlined.Add, connection.connected && !connection.busy && pageState.contentWarnings[file.path] !in listOf("invalid", "empty")) { actions = false; restore = file }
+                                            FileAction(R.string.share_save_downloads, Icons.Outlined.Save) {
+                                                actions = false
+                                                if (Build.VERSION.SDK_INT < 29 && context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                                                    save = file; writeStorage.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                                } else model.save(file)
+                                            }
+                                            FileAction(R.string.share_other_apps, Icons.Outlined.Share) { actions = false; model.shareReceived(context, file) }
+                                        }
+                                    }
                                 } else {
                                     FilledTonalButton(enabled = !pageState.busy && connection.connected && !connection.busy,
                                         onClick = { restore = file }) { Text(stringResource(R.string.share_import)) }
@@ -538,9 +617,9 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                     enabled = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy, onClick = {
                         if (bundles) {
                             model.clearFeedback()
-                            bundleDestination?.launch("MelKit-Bundle.zip")
+                            page = "review"
                         } else begin("send")
-                    }) { Text(stringResource(if (bundles) R.string.bundle_create else R.string.share_create_qr)) }
+                    }) { Text(stringResource(if (bundles) R.string.bundle_review else R.string.share_create_qr)) }
             }
         }
         if (restoreToolbar) {
@@ -555,10 +634,19 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         }
                     }
                 } else {
-                    FilledTonalButton(modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = selectedCount > 0 && !pageState.busy, onClick = {
+                        if (Build.VERSION.SDK_INT < 29 && context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                            bulkSavePending = true; writeStorage.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else model.saveSelected()
+                    }) { Text(stringResource(R.string.bundle_save_selected)) }
+                    TextButton(modifier = Modifier.fillMaxWidth(), enabled = selectedCount > 0 && !pageState.busy,
+                        onClick = { model.shareSelected(context) }) { Text(stringResource(R.string.bundle_share_selected)) }
+                    FilledTonalButton(modifier = Modifier.fillMaxWidth(),
                         enabled = selectedCount > 0 && !pageState.busy && connection.connected && !connection.busy,
                         onClick = { confirmBatch = true }) {
                         Text(stringResource(R.string.bulk_restore_action, selectedCount))
+                    }
                     }
                 }
             }
@@ -594,6 +682,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     if (bundles && editingCover) {
         CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
     }
+    details?.let { file -> FileNameDialog(file.file.name, file.path + "\n" + Formatter.formatFileSize(context, file.bytes)) { details = null } }
     if (confirmBatch) {
         AlertDialog(onDismissRequest = { confirmBatch = false },
             title = { Text(stringResource(R.string.bulk_restore_title)) },
@@ -713,8 +802,13 @@ private fun ShareError(code: String, bundles: Boolean = false) {
     ShareNotice(stringResource(shareErrorText(code, bundles)), error = true)
 }
 
-private fun shareErrorText(code: String, bundles: Boolean): Int {
+internal fun shareErrorText(code: String, bundles: Boolean): Int {
     return when (code) {
+        "CANCELLED" -> R.string.share_cancelled
+        "BUNDLE_UNAVAILABLE" -> R.string.bundle_unavailable
+        "CATALOG_FAILED" -> R.string.bundle_catalog_error
+        "RENAME_FAILED", "INVALID_NAME" -> R.string.bundle_rename_failed
+        "DELETE_FAILED" -> R.string.file_delete_failed
         "PERMISSION", "STORAGE_PERMISSION" -> R.string.share_permission
         "WIFI_OFF" -> R.string.share_wifi_off
         "LOCATION_OFF" -> R.string.share_location

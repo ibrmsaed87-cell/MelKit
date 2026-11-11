@@ -59,7 +59,7 @@ class GameLibraryService : IGameLibrary.Stub() {
         val policy = paths(storageRoot)
         Os.stat(policy.resolve("", true).path)
         val counts = ContentCounts.read(policy.resolve("", true))
-        JSONObject().put("mods", counts.mods).put("maps", counts.maps).put("saves", counts.saves)
+        JSONObject().put("mods", counts.mods).put("maps", counts.maps).put("saves", counts.saves).put("worlds", counts.worlds)
     }
 
     override fun openRead(storageRoot: String, relativePath: String): ParcelFileDescriptor {

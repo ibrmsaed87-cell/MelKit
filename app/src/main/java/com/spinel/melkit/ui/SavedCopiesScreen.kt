@@ -6,6 +6,7 @@ import android.os.Build
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,7 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -81,6 +84,7 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
                     Text(stringResource(when (issue) {
                         "permission" -> R.string.saved_permission
                         "read" -> R.string.saved_read_error
+                        "delete" -> R.string.file_delete_failed
                         "exists" -> R.string.saved_exists
                         "changed" -> R.string.library_source_changed
                         "partial" -> R.string.saved_partial
@@ -104,14 +108,14 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
             item { Text(stringResource(R.string.saved_empty)) }
         }
         items(state.copies, key = { it.uri.toString() }) { copy ->
-            var showDetails by rememberSaveable(copy.uri.toString()) { mutableStateOf(false) }
+            var showActions by rememberSaveable(copy.uri.toString()) { mutableStateOf(false) }
             val preview by produceState<Bitmap?>(null, copy, state.revision) {
                 value = null
                 value = model.preview(copy, state.revision)
             }
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MelkitSurface)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FileCardHeader(copy.name, preview, Icons.Outlined.Description, onDetails = { showDetails = true }) {
+                    FileCardHeader(copy.name, preview, Icons.Outlined.Description, onDetails = { model.showDetails(copy) }) {
                         Text(Formatter.formatFileSize(context, copy.bytes), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (copy.modified > 0) Text(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
@@ -121,6 +125,14 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
                     Text("Download/MelKit/${copy.path}", maxLines = 1, overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box {
+                        IconButton(onClick = { showActions = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.file_actions)) }
+                        FileActionsMenu(showActions, { showActions = false }) {
+                            FileAction(R.string.file_details, Icons.Outlined.Info) { showActions = false; model.showDetails(copy) }
+                            FileAction(R.string.share_other_apps, Icons.Outlined.Share, !state.busy) { showActions = false; model.share(context, copy) }
+                            FileAction(R.string.profile_delete, Icons.Outlined.Delete, !state.busy) { showActions = false; model.requestDelete(copy) }
+                        }
+                    }
                     if (copy.restorable) FilledTonalButton(onClick = { model.requestRestore(copy) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                         enabled = !state.busy && !libraryState.busy && libraryState.connected) {
@@ -128,8 +140,21 @@ fun SavedCopiesScreen(state: SavedCopiesState, model: SavedCopiesViewModel,
                     }
                 }
             }
-            if (showDetails) FileNameDialog(copy.name, "Download/MelKit/${copy.path}") { showDetails = false }
+
         }
+    }
+    state.detail?.let { copy ->
+        FileNameDialog(copy.name, "Download/MelKit/${copy.path}\n" + Formatter.formatFileSize(context, copy.bytes) +
+            if (copy.modified > 0) "\n" + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale).format(Date(copy.modified)) else "") {
+            model.dismissDetails()
+        }
+    }
+    state.deleting?.let { copy ->
+        AlertDialog(onDismissRequest = model::dismissDelete,
+            title = { Text(stringResource(R.string.profile_delete)) },
+            text = { Text(stringResource(R.string.delete_file_confirm, copy.name)) },
+            confirmButton = { TextButton(enabled = !state.busy, onClick = model::deleteConfirmed) { Text(stringResource(R.string.profile_delete)) } },
+            dismissButton = { TextButton(onClick = model::dismissDelete) { Text(stringResource(R.string.saved_cancel)) } })
     }
     state.request?.let { copy ->
         AlertDialog(onDismissRequest = model::dismissRequest,

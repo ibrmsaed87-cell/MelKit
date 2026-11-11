@@ -11,9 +11,9 @@ public final class ContentCounts {
     private static final int MAX_DEPTH = 64;
 
     public static final class Snapshot {
-        public final int mods, maps, saves;
-        private Snapshot(int mods, int maps, int saves) {
-            this.mods = mods; this.maps = maps; this.saves = saves;
+        public final int mods, maps, saves, worlds;
+        private Snapshot(int mods, int maps, int saves, int worlds) {
+            this.mods = mods; this.maps = maps; this.saves = saves; this.worlds = worlds;
         }
     }
 
@@ -23,7 +23,7 @@ public final class ContentCounts {
         if (!root.isDirectory()) throw new IOException("Game folder unavailable");
         File[] folders = root.listFiles();
         if (folders == null) throw new IOException("Cannot list game folder");
-        int mods = 0, maps = 0, saves = 0;
+        int mods = 0, maps = 0, saves = 0, worlds = 0;
         int[] visited = {0};
         for (File folder : folders) {
             String kind = folder.getName().toLowerCase(Locale.ROOT);
@@ -32,15 +32,17 @@ public final class ContentCounts {
                 case "mods": extension = ".melmod"; break;
                 case "maps": extension = ".melmap"; break;
                 case "saves": extension = ".melsave"; break;
+                case "worlds": extension = ".melworld"; break;
                 default: continue;
             }
             if (!folder.isDirectory()) throw new IOException("Content folder unavailable");
             int count = count(policy, folder.getName(), extension, 0, visited);
             if (kind.equals("mods")) mods += count;
             else if (kind.equals("maps")) maps += count;
-            else saves += count;
+            else if (kind.equals("saves")) saves += count;
+            else worlds += count;
         }
-        return new Snapshot(mods, maps, saves);
+        return new Snapshot(mods, maps, saves, worlds);
     }
 
     private static int count(ContentPaths policy, String path, String extension, int depth,

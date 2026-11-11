@@ -22,6 +22,10 @@ public final class ContentCountsCheck {
             Files.write(root.resolve("Saves/empty.melsave"), new byte[0]);
             Files.createDirectories(root.resolve("Worlds/progress"));
             Files.write(root.resolve("Worlds/progress/excluded.melsave"), new byte[] {1});
+            Files.write(root.resolve("Worlds/progress/a.melworld"), new byte[] {1});
+            Files.write(root.resolve("Worlds/second.MELWORLD"), new byte[] {1});
+            var all = ContentCounts.read(root.toFile());
+            expect(all.worlds == 2); expect(all.maps == 1); expect(all.saves == 1);
             expectCounts(root, 54, 1, 1);
             Files.delete(mods.resolve("0.melmod"));
             expectCounts(root, 53, 1, 1);

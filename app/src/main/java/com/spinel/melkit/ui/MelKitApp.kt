@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -73,6 +74,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -107,6 +109,7 @@ import com.spinel.melkit.R
 import com.spinel.melkit.ShizukuVideoActivity
 import com.spinel.melkit.storage.GameLibraryViewModel
 import com.spinel.melkit.storage.GameLibraryState
+import com.spinel.melkit.storage.SavedCopiesState
 import com.spinel.melkit.storage.SavedCopiesViewModel
 import com.spinel.melkit.storage.ModVaultViewModel
 import com.spinel.melkit.storage.ModProfilesViewModel
@@ -166,6 +169,23 @@ fun MelKitApp(shareRequest: Int = 0) {
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
+    val fileWork = libraryState.busy || savedState.busy || vaultState.busy || profilesState.busy || scanState.busy || sharePage.busy || bundlePage.busy
+    LaunchedEffect(sharePage.issue, route) {
+        if (route == "library" && sharePage.issue != null) Toast.makeText(context,
+            shareErrorText(requireNotNull(sharePage.issue), false), Toast.LENGTH_LONG).show()
+    }
+    val operations by libraryModel.journal.records.collectAsState()
+    LaunchedEffect(route, operations, sharePage.savedPath, bundlePage.savedPath) {
+        if (route == "home" || route == "backups") savedModel.refresh()
+    }
+    val owner = LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) { libraryModel.refreshConnection(); savedModel.refresh() }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
     val ads = remember(context) { AdManager.get(context) }
     SideEffect {
         val working = libraryState.busy || savedState.busy || vaultState.busy || profilesState.busy ||
@@ -198,6 +218,11 @@ fun MelKitApp(shareRequest: Int = 0) {
         route = if (root) "home" else parent
     }
 
+    BackHandler(enabled = fileWork) {
+        if (bundlePage.batchRestore?.finished == false) bundleModel.stopRestore()
+        else Toast.makeText(context, R.string.operation_in_progress, Toast.LENGTH_SHORT).show()
+    }
+
     Scaffold(
         containerColor = MelkitBackground,
         topBar = {
@@ -209,7 +234,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                     }
                 },
                 navigationIcon = {
-                    if (!root) IconButton(onClick = {
+                    if (!root) IconButton(enabled = !fileWork, onClick = {
                         if (route == "profiles" && profilesState.editor != null) {
                             if (!profilesState.busy && !libraryState.busy) profilesModel.closeEditor()
                         } else route = parent
@@ -218,7 +243,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                     }
                 },
                 actions = {
-                    if (route != "settings") IconButton(onClick = { navigate("settings") }) {
+                    if (route != "settings") IconButton(enabled = !fileWork, onClick = { navigate("settings") }) {
                         Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
                     }
                 },
@@ -230,7 +255,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                 destinations.forEach { item ->
                     NavigationBarItem(
                         selected = selectedRoot == item.route,
-                        onClick = { parent = item.route; route = item.route },
+                        enabled = !fileWork, onClick = { parent = item.route; route = item.route },
                         icon = { Icon(item.icon, null) },
                         label = { Text(stringResource(item.title), fontSize = 11.sp) },
                     )
@@ -242,8 +267,8 @@ fun MelKitApp(shareRequest: Int = 0) {
             key(route) {
                 if (route == "library") {
                     val covers: LibraryCoversViewModel = viewModel()
-                    LibraryScreen(libraryState, libraryModel, labels, organization, covers,
-                        onOrganize = { navigate("categories") }, onGuide = { navigate("shizuku") })
+                    LibraryScreen(libraryState.copy(busy = libraryState.busy || sharePage.busy), libraryModel, labels, organization, covers,
+                        onOrganize = { navigate("categories") }, onShare = { shareModel.shareGame(context, it, libraryModel) }, onGuide = { navigate("shizuku") })
                 } else if (route == "backups") {
                     SavedCopiesScreen(savedState, savedModel, libraryModel, libraryState)
                 } else if (route == "toggles") {
@@ -269,7 +294,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
                         when (route) {
-                            "home" -> HomeScreen(navigate, libraryState, profilesState, profilesModel, libraryModel)
+                            "home" -> HomeScreen(navigate, libraryState, profilesState, profilesModel, libraryModel, savedState, savedModel)
                             "tools" -> ToolsScreen(toolsTab, { toolsTab = it }, navigate)
                             "settings" -> SettingsScreen()
                             "shizuku" -> ShizukuScreen()
@@ -314,7 +339,8 @@ fun MelKitApp(shareRequest: Int = 0) {
 
 @Composable
 private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, profiles: ModProfilesState,
-    profilesModel: ModProfilesViewModel, library: GameLibraryViewModel) {
+    profilesModel: ModProfilesViewModel, library: GameLibraryViewModel, backups: SavedCopiesState, saved: SavedCopiesViewModel) {
+    val context = LocalContext.current
     val connected = state.connected
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(connected, state.busy, state.previewRevision) {
@@ -342,9 +368,12 @@ private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, prof
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.your_library), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth()) {
-                LibraryStat(R.string.mods, Icons.Outlined.Inventory2, state.counts?.mods, state)
                 LibraryStat(R.string.maps, Icons.Outlined.Map, state.counts?.maps, state)
+                LibraryStat(R.string.mods, Icons.Outlined.Inventory2, state.counts?.mods, state)
+            }
+            Row(Modifier.fillMaxWidth()) {
                 LibraryStat(R.string.saves, Icons.Outlined.Save, state.counts?.saves, state)
+                LibraryStat(R.string.worlds, Icons.Outlined.Public, state.counts?.worlds, state)
             }
             if (connected && state.countsIssue != null) {
                 Text(stringResource(R.string.library_counts_failed), style = MaterialTheme.typography.bodySmall,
@@ -353,9 +382,22 @@ private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, prof
                     Text(stringResource(R.string.library_refresh))
                 }
             }
-            MutedText(if (connected) R.string.library_connected else R.string.not_connected)
-            FilledTonalButton(onClick = { navigate("library") }) {
-                Text(stringResource(R.string.library_browse))
+        }
+    }
+    Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(if (connected) R.string.library_connected else R.string.library_connect_title), fontWeight = FontWeight.Bold)
+            Text(stringResource(if (connected) R.string.library_ready_body else R.string.library_connect_body))
+            FilledTonalButton(enabled = !state.busy, onClick = {
+                if (connected) library.browse("") else library.connect()
+                navigate("library")
+            }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.library_browse)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(enabled = !state.busy, onClick = library::connect) {
+                    Text(stringResource(if (connected) R.string.library_refresh else R.string.library_connect))
+                }
+                TextButton(onClick = { openShizuku(context) }) { Text(stringResource(R.string.open_shizuku)) }
+                TextButton(onClick = { navigate("shizuku") }) { Text(stringResource(R.string.library_help)) }
             }
         }
     }
@@ -383,7 +425,36 @@ private fun HomeScreen(navigate: (String) -> Unit, state: GameLibraryState, prof
     }
     EmptySummary(R.string.no_profile, R.string.manage, Icons.Outlined.Layers, text = profileSummary) { navigate("profiles") }
     SectionLabel(R.string.last_backup)
-    EmptySummary(R.string.no_backup, R.string.view, Icons.Outlined.Archive) { navigate("backups") }
+    val latest = backups.copies.firstOrNull { it.restorable }
+    when {
+        backups.busy && !backups.loaded -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+        backups.issue != null -> EmptySummary(R.string.saved_read_error, R.string.library_refresh, Icons.Outlined.Archive) { saved.refresh() }
+        latest == null -> EmptySummary(R.string.no_backup, R.string.backup_action, Icons.Outlined.Archive) {
+            if (connected) library.browse("") else library.connect()
+            navigate("library")
+        }
+        else -> {
+            val preview by produceState<android.graphics.Bitmap?>(null, latest, backups.revision) { value = saved.preview(latest, backups.revision) }
+            Surface(shape = RoundedCornerShape(20.dp), color = MelkitSurface) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FileCardHeader(latest.name, preview, Icons.Outlined.Archive, onDetails = {
+                        saved.showDetails(latest); navigate("backups")
+                    }) {
+                        Text(stringResource(contentTypeLabel(latest.path)) + " · " + android.text.format.Formatter.formatFileSize(context, latest.bytes),
+                            style = MaterialTheme.typography.bodySmall)
+                        val date = if (latest.created > 0) latest.created else latest.modified
+                        if (date > 0) Text(stringResource(if (latest.created > 0) R.string.backup_created else R.string.backup_modified,
+                            java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT,
+                                ConfigurationCompat.getLocales(context.resources.configuration)[0] ?: Locale.ENGLISH).format(java.util.Date(date))),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    FilledTonalButton(onClick = { saved.showDetails(latest); navigate("backups") }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.view_backup))
+                    }
+                }
+            }
+        }
+    }
     Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Outlined.Info, null, tint = MelkitMint)
@@ -506,7 +577,7 @@ private fun ToolsScreen(selected: Int, onSelect: (Int) -> Unit, navigate: (Strin
     }
     if (selected == 0) {
         ToolCard(R.string.shizuku_guide, R.string.shizuku_description, Icons.Outlined.PlayCircle) { navigate("shizuku") }
-        features.forEach { feature ->
+        features.filterNot { it.route in listOf("categories", "thumbnails") }.forEach { feature ->
             ToolCard(feature.title, feature.description, feature.icon,
                 planned = feature.route !in listOf("toggles", "profiles", "scanner", "bundles", "categories", "thumbnails", "history")) {
                 navigate(feature.route)

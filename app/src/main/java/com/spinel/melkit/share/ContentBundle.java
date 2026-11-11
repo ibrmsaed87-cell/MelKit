@@ -114,6 +114,14 @@ public final class ContentBundle {
     private static int read(File archive, File directory) throws Exception {
         require(archive.length() <= MAX_ARCHIVE, "INVALID_BUNDLE");
         try (ZipFile zip = new ZipFile(archive)) {
+            Set<String> zipNames = new HashSet<>();
+            Enumeration<? extends ZipEntry> archiveEntries = zip.entries();
+            while (archiveEntries.hasMoreElements()) {
+                ZipEntry candidate = archiveEntries.nextElement();
+                require(zipNames.add(candidate.getName().toLowerCase(Locale.ROOT)), "DUPLICATE_NAME");
+                require(candidate.getName().equals(MANIFEST) || candidate.getName().equals(COVER_FILE)
+                        || ShareWire.validPath(candidate.getName()), "INVALID_BUNDLE");
+            }
             ZipEntry index = zip.getEntry(MANIFEST);
             require(index != null && index.getSize() > 0 && index.getSize() <= 2 * 1024 * 1024,
                     "INVALID_BUNDLE");
@@ -148,6 +156,7 @@ public final class ContentBundle {
                         verify(input, null, entry);
                     } else {
                         File file = new File(directory, entry.path);
+                        require(file.getCanonicalPath().startsWith(directory.getCanonicalPath() + File.separator), "INVALID_BUNDLE");
                         File parent = file.getParentFile();
                         require((parent.isDirectory() || parent.mkdirs()) && file.createNewFile(), "INVALID_BUNDLE");
                         try (FileOutputStream output = new FileOutputStream(file)) {

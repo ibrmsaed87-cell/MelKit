@@ -50,7 +50,9 @@ internal data class SharePage(val queue: List<ShareInput> = emptyList(), val rec
     val savedPath: String? = null, val bundleStatus: String? = null, val bundleName: String? = null,
     val bundleUri: Uri? = null, val bundleBatch: String? = null,
     val restoreSelection: Set<String> = emptySet(), val batchRestore: BatchRestore.Snapshot? = null,
-    val draftCover: Bitmap? = null, val receivedCover: Bitmap? = null)
+    val draftCover: Bitmap? = null, val receivedCover: Bitmap? = null, val draftName: String = "",
+    val preflight: Map<String, String> = emptyMap(), val contentWarnings: Map<String, String> = emptyMap(),
+    val duplicateContent: Map<String, String> = emptyMap(), val exportResults: Map<String, String> = emptyMap())
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application
@@ -58,6 +60,39 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     private val mutableState = MutableStateFlow(SharePage())
     val state = mutableState.asStateFlow()
     val transfer = MelKitShareService.state
+    private val catalog = SavedBundleStore(application)
+    private val mutableBundles = MutableStateFlow<List<SavedBundle>>(emptyList())
+    val savedBundles = mutableBundles.asStateFlow()
+    init { refreshBundles() }
+    fun refreshBundles() { viewModelScope.launch {
+        try { mutableBundles.value = withContext(Dispatchers.IO) { catalog.read() } }
+        catch (_: Exception) { issue("CATALOG_FAILED") }
+    } }
+    suspend fun bundleCover(item: SavedBundle): Bitmap? = withContext(Dispatchers.IO) { catalog.cover(item) }
+    fun renameBundle(item: SavedBundle, name: String) = run {
+        withContext(Dispatchers.IO) { catalog.rename(item, name); mutableBundles.value = catalog.read() }
+    }
+    fun deleteBundle(item: SavedBundle) = run {
+        withContext(Dispatchers.IO) { catalog.delete(item); mutableBundles.value = catalog.read() }
+    }
+    fun openSavedBundle(item: SavedBundle) = run {
+        withContext(Dispatchers.IO) { catalog.available(item) }
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet(), received = emptyList(), preflight = emptyMap()) }
+        val (batch, cover) = runInterruptible(Dispatchers.IO) {
+            withBundleArchive { archive ->
+                openSource(item.uri).use { source -> archive.outputStream().use { ContentBundle.copy(source, it, ContentBundle.MAX_ARCHIVE, null) } }
+                unpackBundle(archive)
+            }
+        }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
+    }
+    fun shareSavedBundle(activity: Context, item: SavedBundle) = run {
+        withContext(Dispatchers.IO) { catalog.available(item) }
+        shareUri(activity, item.uri, "application/zip", item.name)
+    }
+    fun bundleName(name: String) { mutableState.update { it.copy(draftName = name.take(120), bundleUri = null) } }
+    fun clearSelection() { if (!state.value.busy) mutableState.update { it.copy(queue = emptyList(), bundleUri = null) } }
+
     private var resetWhenIdle = false
     private var activeRestore: BatchRestore? = null
 
@@ -71,7 +106,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                issue(error.message?.takeIf { it.matches(Regex("[A-Z_]+")) } ?: "IO")
+                issue(errorCode(error))
             } finally {
                 mutableState.update { it.copy(busy = false) }
                 if (resetWhenIdle) closeBundleSession()
@@ -79,8 +114,15 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    private fun errorCode(error: Exception): String {
+        if (generateSequence<Throwable>(error) { it.cause }.any { it is android.system.ErrnoException && it.errno == android.system.OsConstants.ENOSPC }) return "SPACE"
+        if (error is SecurityException) return "PERMISSION"
+        if (error is java.io.FileNotFoundException) return "SOURCE_ACCESS"
+        return error.message?.takeIf { it.matches(Regex("[A-Z_]+")) } ?: "IO"
+    }
+
     fun clearFeedback() { mutableState.update { it.copy(issue = null, saved = false, imported = false,
-        savedPath = null, bundleStatus = null, batchRestore = if (it.busy) it.batchRestore else null) } }
+        savedPath = null, bundleStatus = null, exportResults = emptyMap(), batchRestore = if (it.busy) it.batchRestore else null) } }
 
     fun issue(code: String?) {
         clearFeedback()
@@ -157,6 +199,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun saveBundle(destination: Uri) = run {
+        var archiveBytes = 0L
         val queue = mutableState.value.queue
         val cover = mutableState.value.draftCover
         mutableState.update { it.copy(bundleUri = null) }
@@ -167,6 +210,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                         ContentBundle.Source(input.path, input.size, { input.open() }, { input.verifySource() })
                     }, cover?.let(CoverPhoto::encode))
                     val size = archive.length()
+                    archiveBytes = size
                     val written = MessageDigest.getInstance("SHA-256")
                     val verified = MessageDigest.getInstance("SHA-256")
                     val count = archive.inputStream().use { source ->
@@ -177,24 +221,24 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                     check(count == size && readBack == size && MessageDigest.isEqual(written.digest(), verified.digest())) { "CHECKSUM" }
                 }
             } catch (error: Exception) {
-                runCatching { DocumentsContract.deleteDocument(context.contentResolver, destination) }
                 throw error
             }
         }
-        val name = withContext(Dispatchers.IO) {
-            runCatching {
-                context.contentResolver.query(destination, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                    if (it.moveToFirst()) it.getString(0) else null
-                }
-            }.getOrNull()
+        val item = try { withContext(Dispatchers.IO) {
+            catalog.add(destination, mutableState.value.draftName.ifBlank { "MelKit-Bundle" } + ".zip",
+                catalog.metadata(destination).second.takeIf { it >= 0 } ?: archiveBytes, queue.map { it.path }, cover).also { mutableBundles.value = catalog.read() }
         }
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (error: Exception) { throw IOException("CATALOG_FAILED", error) }
+        val name = item.name
         AdManager.get(context).afterTask(AdPlacement.BUNDLE) {
             mutableState.update { it.copy(bundleUri = destination, bundleStatus = "saved", bundleName = name) }
         }
     }
 
     fun importBundle(uri: Uri) = run {
-        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet()) }
+        catalog.retain(uri)
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet(), preflight = emptyMap(), received = emptyList()) }
         val (batch, cover) = runInterruptible(Dispatchers.IO) {
             withBundleArchive { archive ->
                 openSource(uri).use { source ->
@@ -207,8 +251,8 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun openReceivedBundle(item: ReceivedFile) = run {
-        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet()) }
-        val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}".toByteArray()).toString()
+        mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet(), preflight = emptyMap(), received = emptyList()) }
+        val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}:${item.path}".toByteArray()).toString()
         val (batch, cover) = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
         mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
     }
@@ -230,6 +274,19 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 staging.deleteRecursively()
             }
         }
+        val warnings = linkedMapOf<String, String>()
+        val duplicates = linkedMapOf<String, String>()
+        val hashes = mutableMapOf<String, String>()
+        val validator = com.spinel.melkit.storage.FileScan(destination, com.spinel.melkit.storage.GamePreviewReader::validJsonObject)
+        destination.walkTopDown().filter { it.isFile && ShareWire.validPath(it.relativeTo(destination).invariantSeparatorsPath) }.forEach { file ->
+            val path = file.relativeTo(destination).invariantSeparatorsPath
+            warnings[path] = runCatching { validator.inspectContent(path) }.getOrDefault("unreadable")
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { ContentBundle.copy(it, null, ShareWire.MAX_FILE, digest) }
+            val hash = file.length().toString() + ":" + digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+            hashes.putIfAbsent(hash, path)?.let { duplicates[path] = it }
+        }
+        mutableState.update { it.copy(contentWarnings = warnings, duplicateContent = duplicates) }
         val image = File(destination, ContentBundle.COVER_FILE)
         val cover = runCatching {
             if (image.length() in 1L..PreviewImages.MAX_IMAGE_BYTES.toLong()) PreviewBitmap.decode(image.readBytes()) else null
@@ -304,9 +361,58 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     private fun bundleFiles(page: SharePage): List<ReceivedFile> = if (page.bundleBatch == null) emptyList() else
         page.received.filter { it.batch == page.bundleBatch && ShareWire.validPath(it.path) }
 
+    fun inspectBundle(library: GameLibraryViewModel) {
+        val batch = state.value.bundleBatch ?: return
+        val paths = bundleFiles(state.value).map { it.path }
+        viewModelScope.launch {
+            val info = library.existingContent(paths)
+            if (state.value.bundleBatch == batch) mutableState.update { it.copy(preflight = info) }
+        }
+    }
+
+    fun saveSelected() = run {
+        val files = bundleFiles(state.value).filter { it.path in state.value.restoreSelection }
+        val results = linkedMapOf<String, String>()
+        for (file in files) {
+            currentCoroutineContext().ensureActive()
+            results[file.path] = try { saveVerified(file); "ok" } catch (cancelled: CancellationException) { throw cancelled
+                } catch (error: Exception) { errorCode(error) }
+            if (results.size < files.size) mutableState.update { it.copy(exportResults = results.toMap()) }
+        }
+        val publish = { mutableState.update { it.copy(exportResults = results.toMap()) } }
+        if (results.isNotEmpty() && results.values.all { it == "ok" }) AdManager.get(context).afterTask(AdPlacement.BACKUP, publish)
+        else publish()
+    }
+
+    fun shareSelected(activity: Context) {
+        val files = bundleFiles(state.value).filter { it.path in state.value.restoreSelection }
+        if (files.isEmpty()) return
+        runCatching {
+            val uris = ArrayList(files.map { FileProvider.getUriForFile(context, context.packageName + ".sharefiles", it.file) })
+            val send = Intent(Intent.ACTION_SEND_MULTIPLE).setType("application/octet-stream")
+                .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            send.clipData = ClipData.newRawUri("MelKit", uris.first()).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
+            activity.startActivity(Intent.createChooser(send, null))
+        }.onFailure { issue("IO") }
+    }
+
+    fun shareGame(activity: Context, entry: GameEntry, library: GameLibraryViewModel) = run {
+        val input = library.shareInput(entry) ?: throw IOException("SOURCE_ACCESS")
+        val file = withContext(Dispatchers.IO) {
+            val dir = File(context.cacheDir, "share-content/" + UUID.randomUUID()).apply { check(mkdirs()) }
+            File(dir, entry.name).also { target ->
+                try {
+                    input.open().use { source -> target.outputStream().use { ContentBundle.copy(source, it, input.size, null) } }
+                    check(target.length() == input.size) { "FILE_CHANGED" }; input.verifySource()
+                } catch (error: Exception) { target.delete(); throw error }
+            }
+        }
+        shareFile(activity, file, "application/octet-stream")
+    }
+
     fun selectForRestore(path: String) {
         val page = mutableState.value
-        if (page.busy || bundleFiles(page).none { it.path == path }) return
+        if (page.busy || bundleFiles(page).none { it.path == path } || page.contentWarnings[path] in listOf("invalid", "empty")) return
         clearFeedback()
         mutableState.update { it.copy(restoreSelection = if (path in it.restoreSelection)
             it.restoreSelection - path else it.restoreSelection + path) }
@@ -315,7 +421,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     fun selectAllForRestore() {
         val page = mutableState.value
         if (page.busy) return
-        val paths = bundleFiles(page).map { it.path }.toSet()
+        val paths = bundleFiles(page).filter { page.contentWarnings[it.path] !in listOf("invalid", "empty") }.map { it.path }.toSet()
         clearFeedback()
         mutableState.update { it.copy(restoreSelection = if (paths.isNotEmpty() && paths == it.restoreSelection)
             emptySet() else paths) }
@@ -332,7 +438,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         val page = mutableState.value
         if (page.busy) return
         val files = bundleFiles(page).filter { it.path in page.restoreSelection }
-        if (files.isEmpty() || files.size != page.restoreSelection.size) { issue("INVALID_FILE"); return }
+        if (files.isEmpty() || files.size != page.restoreSelection.size || files.any { page.contentWarnings[it.path] in listOf("invalid", "empty") }) { issue("INVALID_FILE"); return }
         val batch = try { BatchRestore(files.map { it.path }) } catch (_: IllegalArgumentException) {
             issue("INVALID_FILE"); return
         }
@@ -372,8 +478,10 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun save(item: ReceivedFile) = run {
-        val path = withContext(Dispatchers.IO) {
+    private suspend fun saveVerified(item: ReceivedFile): String = withContext(Dispatchers.IO) {
+            @Suppress("DEPRECATION")
+            val available = android.os.Environment.getExternalStorageDirectory().usableSpace
+            if (available > 0 && available < item.bytes) throw IOException("SPACE")
             val copy = DownloadCopy.create(context, item.path)
             try {
                 val sent = MessageDigest.getInstance("SHA-256")
@@ -393,6 +501,8 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 throw error
             }
         }
+    fun save(item: ReceivedFile) = run {
+        val path = saveVerified(item)
         AdManager.get(context).afterTask(AdPlacement.BACKUP) {
             mutableState.update { it.copy(saved = true, savedPath = path) }
         }
@@ -450,7 +560,9 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     fun reset(clearQueue: Boolean) {
         MelKitShareService.reset()
         mutableState.update { it.copy(queue = if (clearQueue) emptyList() else it.queue,
-            issue = null, saved = false, imported = false, savedPath = null, bundleStatus = null) }
+            issue = null, saved = false, imported = false, savedPath = null, bundleStatus = null,
+            bundleBatch = null, receivedCover = null, received = emptyList(), restoreSelection = emptySet(),
+            batchRestore = null, preflight = emptyMap(), exportResults = emptyMap()) }
     }
 
     private object DiscardOutput : java.io.OutputStream() {
