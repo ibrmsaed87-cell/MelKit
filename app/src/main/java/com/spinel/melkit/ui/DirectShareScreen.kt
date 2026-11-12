@@ -53,26 +53,32 @@ import kotlinx.coroutines.flow.first
 @Composable
 internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewModel,
     connection: GameLibraryState, saved: SavedCopiesViewModel, copies: SavedCopiesState,
-    bundles: Boolean = false, guide: () -> Unit) {
+    bundles: Boolean = false, registerBack: (((() -> Boolean)?) -> Unit) = {}, guide: () -> Unit) {
     val context = LocalContext.current
     val pageState by model.state.collectAsState()
     val transfer by model.transfer.collectAsState()
+    val bundleMode = bundles || pageState.editing
+    var discardDraft by remember { mutableStateOf(false) }
+    var chooseEditFolder by remember { mutableStateOf(false) }
     val savedBundles by model.savedBundles.collectAsState()
     var bulkSavePending by remember { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(if (bundles) "bundle_menu" else "menu") }
+    var pickReturn by rememberSaveable { mutableStateOf(if (bundles) "bundle_menu" else "menu") }
     var source by rememberSaveable { mutableStateOf("game") }
     var pending by rememberSaveable { mutableStateOf("") }
     var editingCover by rememberSaveable { mutableStateOf(false) }
     var restore by remember { mutableStateOf<ReceivedFile?>(null) }
     var confirmBatch by remember { mutableStateOf(false) }
     var details by remember { mutableStateOf<ReceivedFile?>(null) }
+    var receivedArchiveForSave by remember { mutableStateOf<ReceivedFile?>(null) }
     var save by remember { mutableStateOf<ReceivedFile?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.saved_location, pageState.savedPath.orEmpty())
     val openFolderLabel = stringResource(R.string.open_saved_folder)
     val issueMessage = pageState.issue?.let { stringResource(shareErrorText(it, bundles || page == "contents")) }
     val importedMessage = stringResource(R.string.share_imported)
-    LaunchedEffect(pageState.savedPath, pageState.issue, pageState.imported) {
+    val bundleSavedMessage = stringResource(R.string.bundle_saved)
+    LaunchedEffect(pageState.savedPath, pageState.issue, pageState.imported, pageState.bundleStatus) {
         val path = pageState.savedPath
         when {
             path != null -> {
@@ -83,6 +89,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             issueMessage != null -> snackbar.showSnackbar(issueMessage, withDismissAction = true,
                 duration = SnackbarDuration.Long)
             pageState.imported -> snackbar.showSnackbar(importedMessage)
+            pageState.bundleStatus == "saved" -> snackbar.showSnackbar(bundleSavedMessage)
         }
     }
     val prompt = stringResource(R.string.share_scan_prompt)
@@ -97,9 +104,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 model.send(context)
             }
             "send_bundle" -> {
-                val uri = pageState.bundleUri
+                val uri = model.state.value.bundleUri
                 if (uri != null && !model.transfer.value.active) {
-                    model.reset(clearQueue = false)
                     page = "transfer"
                     model.sendBundle(context, uri)
                 }
@@ -130,16 +136,18 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val documents = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) model.addDocuments(uris)
     }
-    val bundleDestination = if (bundles) {
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-            if (uri != null) model.saveBundle(uri) else model.issue("CANCELLED")
-        }
-    } else null
-    val bundleSource = if (bundles) {
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let(model::importBundle)
-        }
-    } else null
+    val bundleDestination = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val receivedArchive = receivedArchiveForSave
+        receivedArchiveForSave = null
+        if (uri != null && receivedArchive != null) model.saveReceivedBundle(receivedArchive, uri)
+        else if (uri != null) model.saveBundle(uri) else model.issue("CANCELLED")
+    }
+    val bundleSource = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(model::importBundle)
+    }
+    val editFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) model.saveEditedBundle(uri) else model.issue("CANCELLED")
+    }
     val readStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         if (allowed) saved.refresh() else model.issue("STORAGE_PERMISSION")
     }
@@ -157,7 +165,10 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
         }
     }
     LaunchedEffect(pageState.bundleUri) {
-        if (bundles && pageState.bundleUri != null && page == "review") page = "bundle_ready"
+        if (bundleMode && pageState.bundleUri != null && page == "review") page = "bundle_ready"
+    }
+    LaunchedEffect(pageState.editorId) {
+        if (pageState.editorId != null) page = "review"
     }
     LaunchedEffect(pageState.bundleBatch) {
         if (bundles && pageState.bundleBatch != null) page = "contents"
@@ -170,10 +181,23 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     }
     val entryPage = if (bundles) "bundle_menu" else "menu"
     val returnPage = if (!bundles && page == "contents") "history" else entryPage
-    BackHandler(enabled = page != entryPage && !transfer.active && !pageState.busy) {
-        model.clearFeedback()
-        page = if (page == "review") "pick" else returnPage
+    val goBack: () -> Boolean = {
+        when {
+            pageState.busy || transfer.active -> true
+            editingCover -> { editingCover = false; true }
+            page == "review" -> { model.clearFeedback(); pickReturn = entryPage; page = "pick"; true }
+            page == "pick" && pickReturn == "review" -> { page = "review"; true }
+            page == "pick" && bundleMode && pageState.dirty -> { discardDraft = true; true }
+            page != entryPage -> { model.clearFeedback(); page = returnPage; true }
+            else -> false
+        }
     }
+    val currentBack by rememberUpdatedState(goBack)
+    DisposableEffect(Unit) {
+        registerBack { currentBack() }
+        onDispose { registerBack(null) }
+    }
+    BackHandler(enabled = page != entryPage || transfer.active || pageState.busy) { goBack() }
     LaunchedEffect(connection.path, connection.connected, connection.busy) {
         if (connection.connected && !connection.busy && connection.path.isEmpty()) library.refreshCounts()
     }
@@ -216,7 +240,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text(stringResource(when (screen) {
-                        "pick" -> if (bundles) R.string.bundle_choose else R.string.share_choose
+                        "pick" -> if (bundleMode) R.string.bundle_choose else R.string.share_choose
                         "history" -> R.string.share_received_files
                         "contents" -> R.string.bundle_contents
                         "transfer" -> R.string.share_transfer
@@ -237,6 +261,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                             ShareCard(R.string.bundle_new, R.string.bundle_new_help) {
                                 FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
                                     model.closeBundleSession()
+                                    pickReturn = entryPage
                                     source = "game"
                                     if (connection.connected && !connection.busy) library.browse("")
                                     page = "pick"
@@ -251,7 +276,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                             ShareCard(R.string.bundle_import, R.string.bundle_open_help) {
                                 OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy, onClick = {
                                     model.clearFeedback()
-                                    bundleSource?.launch(arrayOf("*/*"))
+                                    bundleSource.launch(arrayOf("*/*"))
                                 }) {
                                     Icon(Icons.Outlined.FolderOpen, null)
                                     Spacer(Modifier.width(8.dp))
@@ -261,7 +286,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         }
                         item { Text(stringResource(R.string.my_saved_bundles), style = MaterialTheme.typography.titleLarge) }
                         if (savedBundles.isEmpty()) item { Text(stringResource(R.string.no_saved_bundles)) }
-                        items(savedBundles, key = { "catalog:" + it.id }) { item -> SavedBundleCard(item, model, !pageState.busy) }
+                        items(savedBundles, key = { "catalog:" + it.id }) { item -> SavedBundleCard(item, model, !pageState.busy) { bundle -> model.prepareBundleShare(bundle); begin("send_bundle") } }
                     }
                     "review" -> {
                         item {
@@ -272,13 +297,29 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                 Text(stringResource(R.string.content_file_count, pageState.queue.size))
                                 Text(pageState.queue.map { stringResource(contentTypeLabel(it.path)) }.distinct().joinToString(" · "))
                                 pageState.draftCover?.let { CoverPreview(it, Modifier.size(96.dp)) }
-                                OutlinedButton(enabled = !pageState.busy, onClick = { editingCover = true }) { Text(stringResource(R.string.cover_edit)) }
-                                OutlinedButton(enabled = !pageState.busy, onClick = { page = "pick" }) { Text(stringResource(R.string.bundle_edit_selection)) }
+                                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp), enabled = !pageState.busy,
+                                        onClick = { editingCover = true }) { Text(stringResource(R.string.cover_edit), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                                    OutlinedButton(modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp), enabled = !pageState.busy,
+                                        onClick = { pickReturn = "review"; page = "pick" }) { Text(stringResource(R.string.bundle_edit_selection), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                                }
+                                if (pageState.editing) {
+                                    Text(stringResource(R.string.bundle_edit_help))
+                                    if (!pageState.sourceWritable) Text(stringResource(R.string.bundle_read_only))
+                                    FilledTonalButton(modifier = Modifier.fillMaxWidth(),
+                                        enabled = !pageState.busy && pageState.sourceWritable && pageState.queue.isNotEmpty() &&
+                                            pageState.draftName.isNotBlank(), onClick = {
+                                            if (model.canReplaceWithoutFolder()) model.saveEditedBundle()
+                                            else chooseEditFolder = true
+                                        }) { Text(stringResource(R.string.bundle_save_changes)) }
+                                }
                                 FilledTonalButton(modifier = Modifier.fillMaxWidth(),
                                     enabled = !pageState.busy && pageState.queue.isNotEmpty() && pageState.draftName.trim().isNotEmpty() &&
                                         pageState.draftName.none { it == '/' || it == '\\' || it.code < 32 },
-                                    onClick = { bundleDestination?.launch(pageState.draftName.trim().removeSuffix(".zip") + ".zip") }) {
-                                    Text(stringResource(R.string.bundle_save_zip))
+                                    onClick = { bundleDestination.launch(pageState.draftName.trim().removeSuffix(".zip") + ".zip") }) {
+                                    Text(stringResource(if (pageState.editing) R.string.bundle_save_as_new else R.string.bundle_save_zip))
                                 }
                             }
                         }
@@ -303,13 +344,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                 pageState.bundleName?.let { SharePath(it) }
                                 pageState.bundleUri?.let { uri ->
                                     FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy && !transfer.active,
-                                        onClick = { begin("send_bundle") }) { Text(stringResource(R.string.bundle_send_direct)) }
-                                    OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !pageState.busy,
-                                        onClick = { model.shareBundle(context, uri) }) {
-                                        Icon(Icons.Outlined.Share, null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(stringResource(R.string.share_other_apps))
-                                    }
+                                        onClick = { begin("send_bundle") }) { Text(stringResource(R.string.bundle_share_melkit)) }
+
                                 }
                             }
                         }
@@ -355,8 +391,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                     "pick" -> {
                         item {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (bundles) {
-                                    OutlinedButton(enabled = !pageState.busy, onClick = { model.clearFeedback(); page = entryPage }) {
+                                if (bundleMode) {
+                                    OutlinedButton(enabled = !pageState.busy, onClick = { if (pageState.dirty) discardDraft = true else { model.clearFeedback(); page = entryPage } }) {
                                         Text(stringResource(R.string.bundle_home))
                                     }
                                 }
@@ -495,6 +531,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                     }
                     "history", "contents" -> {
                         if (screen == "contents") item {
+                            OutlinedButton(enabled = !pageState.busy && pageState.openedUri != null,
+                                onClick = model::editOpenedBundle) { Text(stringResource(R.string.bundle_edit)) }
                             pageState.receivedCover?.let { CoverPreview(it, Modifier.size(120.dp)) }
                             OutlinedButton(enabled = !pageState.busy, onClick = { model.clearFeedback(); page = returnPage }) {
                                 Text(stringResource(if (bundles) R.string.bundle_home else R.string.share_received_files))
@@ -575,6 +613,10 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                         model.openReceivedBundle(file)
                                         page = "contents"
                                     }) { Text(stringResource(R.string.bundle_open_received)) }
+                                    OutlinedButton(enabled = !pageState.busy, onClick = {
+                                        receivedArchiveForSave = file
+                                        bundleDestination.launch(file.file.name)
+                                    }) { Text(stringResource(R.string.bundle_save_zip)) }
                                 } else if (screen == "contents") {
                                     var actions by remember(file.path) { mutableStateOf(false) }
                                     Box {
@@ -615,11 +657,11 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             Surface(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), color = MelkitSurface, shadowElevation = 4.dp) {
                 FilledTonalButton(modifier = Modifier.padding(12.dp).fillMaxWidth(),
                     enabled = pageState.queue.isNotEmpty() && !pageState.busy && !connection.busy, onClick = {
-                        if (bundles) {
+                        if (bundleMode) {
                             model.clearFeedback()
                             page = "review"
                         } else begin("send")
-                    }) { Text(stringResource(if (bundles) R.string.bundle_review else R.string.share_create_qr)) }
+                    }) { Text(stringResource(if (bundleMode) R.string.bundle_review else R.string.share_create_qr)) }
             }
         }
         if (restoreToolbar) {
@@ -679,9 +721,18 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 TextButton(onClick = { reviewingSelection = false }) { Text(stringResource(android.R.string.ok)) }
             })
     }
-    if (bundles && editingCover) {
+    if (bundleMode && editingCover) {
         CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
     }
+    if (chooseEditFolder) AlertDialog(onDismissRequest = { chooseEditFolder = false },
+        title = { Text(stringResource(R.string.bundle_save_changes)) },
+        text = { Text(stringResource(R.string.bundle_choose_parent)) },
+        confirmButton = { TextButton(onClick = { chooseEditFolder = false; editFolder.launch(null) }) { Text(stringResource(R.string.vault_closed_continue)) } },
+        dismissButton = { TextButton(onClick = { chooseEditFolder = false }) { Text(stringResource(R.string.saved_cancel)) } })
+    if (discardDraft) AlertDialog(onDismissRequest = { discardDraft = false },
+        title = { Text(stringResource(R.string.bundle_discard_title)) }, text = { Text(stringResource(R.string.bundle_discard_body)) },
+        confirmButton = { TextButton(onClick = { discardDraft = false; model.closeBundleSession(); page = entryPage }) { Text(stringResource(R.string.bundle_discard)) } },
+        dismissButton = { TextButton(onClick = { discardDraft = false }) { Text(stringResource(R.string.bundle_keep_editing)) } })
     details?.let { file -> FileNameDialog(file.file.name, file.path + "\n" + Formatter.formatFileSize(context, file.bytes)) { details = null } }
     if (confirmBatch) {
         AlertDialog(onDismissRequest = { confirmBatch = false },
@@ -804,6 +855,8 @@ private fun ShareError(code: String, bundles: Boolean = false) {
 
 internal fun shareErrorText(code: String, bundles: Boolean): Int {
     return when (code) {
+        "BUNDLE_READ_ONLY", "BUNDLE_SAVE_NEW_REQUIRED" -> R.string.bundle_read_only
+        "BUNDLE_FOLDER_REQUIRED" -> R.string.bundle_choose_parent
         "CANCELLED" -> R.string.share_cancelled
         "BUNDLE_UNAVAILABLE" -> R.string.bundle_unavailable
         "CATALOG_FAILED" -> R.string.bundle_catalog_error

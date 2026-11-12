@@ -19,7 +19,7 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-internal fun SavedBundleCard(item: SavedBundle, model: ShareViewModel, enabled: Boolean) {
+internal fun SavedBundleCard(item: SavedBundle, model: ShareViewModel, enabled: Boolean, onShare: (SavedBundle) -> Unit) {
     val context = LocalContext.current
     var menu by rememberSaveable(item.id) { mutableStateOf(false) }
     var dialog by rememberSaveable(item.id) { mutableStateOf("") }
@@ -40,7 +40,8 @@ internal fun SavedBundleCard(item: SavedBundle, model: ShareViewModel, enabled: 
                 Box {
                     IconButton(enabled = enabled, onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.file_actions)) }
                     FileActionsMenu(menu, { menu = false }) {
-                        FileAction(R.string.share_other_apps, Icons.Outlined.Share) { menu = false; model.shareSavedBundle(context, item) }
+                        FileAction(R.string.bundle_edit, Icons.Outlined.Edit) { menu = false; model.editSavedBundle(item) }
+                        FileAction(R.string.bundle_share_melkit, Icons.Outlined.Share) { menu = false; onShare(item) }
                         FileAction(R.string.bundle_rename, Icons.Outlined.Edit) { menu = false; dialog = "rename" }
                         FileAction(R.string.file_details, Icons.Outlined.Info) { menu = false; dialog = "details" }
                         FileAction(R.string.file_delete, Icons.Outlined.Delete) { menu = false; dialog = "delete" }

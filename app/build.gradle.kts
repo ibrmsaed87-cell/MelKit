@@ -10,7 +10,7 @@ plugins {
 fun signingValue(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 val releaseKeyPath = signingValue("MELKIT_KEYSTORE_PATH")
 val configuredVersionCode = providers.environmentVariable("MELKIT_VERSION_CODE")
-    .map { it.toInt() }.getOrElse(1)
+    .map { it.toInt() }.getOrElse(2)
 // Production release uses the verified MelKit units. CI explicitly selects test units for phone-test APKs.
 val liveAds = providers.environmentVariable("MELKIT_LIVE_ADS").orElse("true").map {
     require(it == "true" || it == "false") { "MELKIT_LIVE_ADS must be true or false" }
@@ -28,7 +28,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = configuredVersionCode
-        versionName = "0.1.16"
+        versionName = "0.1.17"
         buildConfigField("boolean", "TEST_ADS", (!liveAds).toString())
     }
 

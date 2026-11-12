@@ -161,6 +161,29 @@ public final class FileScanCheck {
             check(Files.isRegularFile(game.resolve(empty)) && Files.size(game.resolve(empty)) == 0, "Empty world can be restored exactly");
             ModVault modVault = new ModVault(game.toFile(), temp.resolve("DisabledMods").toFile());
             rejects(SecurityException.class, () -> modVault.disable(duplicate, bytes.length, 0), "Ordinary mod vault still rejects maps");
+            Path backups = temp.resolve("ScanBackups");
+            FileScan.Finding unknown = finding(scanner.run(), "Mods/Unknown.txt");
+            File safeCopy = ScanFileActions.backup(scanner, unknown, backups.toFile());
+            check(safeCopy.isFile() && Files.exists(game.resolve(unknown.path)), "Backup keeps unknown game file");
+            scanner.quarantineExplicit(unknown, reopened);
+            check(!Files.exists(game.resolve(unknown.path)), "Explicit quarantine permits unknown extension without labelling corruption");
+            ModVault.Item unknownItem = reopened.stored().items.stream().filter(item -> item.path.equals(unknown.path)).findFirst().orElseThrow();
+            reopened.enable(unknownItem.id);
+            check(Files.exists(game.resolve(unknown.path)), "Unknown extension is reversibly restored");
+            FileScan.Finding renameSource = finding(scanner.run(), "Mods/Unknown.txt");
+            write(game.resolve("Mods/Taken.txt"), new byte[]{9});
+            rejects(ModVault.Conflict.class, () -> ScanFileActions.rename(game.toFile(), scanner, renameSource, "Taken", backups.toFile()), "Rename refuses collision");
+            check(Files.readAllBytes(game.resolve("Mods/Taken.txt"))[0] == 9 && Files.exists(game.resolve(unknown.path)), "Collision keeps both originals");
+            rejects(IOException.class, () -> ScanFileActions.rename(game.toFile(), scanner, renameSource, "../escape", backups.toFile()), "Rename rejects path traversal");
+            String renamed = ScanFileActions.rename(game.toFile(), scanner, renameSource, "جديد", backups.toFile());
+            check(renamed.equals("Mods/جديد.txt") && Files.exists(game.resolve(renamed)) && !Files.exists(game.resolve(unknown.path)), "Rename preserves original extension");
+            FileScan.Finding deleteSource = finding(scanner.run(), renamed);
+            File deletedBackup = ScanFileActions.delete(scanner, deleteSource, backups.toFile());
+            check(!Files.exists(game.resolve(renamed)) && deletedBackup.isFile(), "Explicit delete keeps a verified safety backup");
+            FileScan.Finding changedBackup = finding(scanner.run(), foreign);
+            Files.write(game.resolve(foreign), new byte[]{1, 2, 3, 4});
+            rejects(ModVault.Changed.class, () -> ScanFileActions.backup(scanner, changedBackup, backups.toFile()), "Stale backup cannot report success");
+            check(Files.size(game.resolve(foreign)) == 4, "Stale action preserves changed source");
         } finally {
             try (java.util.stream.Stream<Path> files = Files.walk(temp)) {
                 files.sorted(Comparator.reverseOrder()).forEach(file -> {

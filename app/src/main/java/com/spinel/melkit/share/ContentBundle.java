@@ -53,6 +53,26 @@ public final class ContentBundle {
     }
 
     public static void write(File archive, List<Source> sources, byte[] cover) throws Exception {
+        writeInternal(archive, sources, cover, null);
+    }
+
+    public static void verify(File archive) throws Exception { read(archive, null); }
+
+    /** Same v1/v2 manifest; preserve archive and retained-entry metadata when editing. */
+    public static void writeEdited(File archive, File original, List<Source> sources, byte[] cover) throws Exception {
+        require(!archive.getCanonicalFile().equals(original.getCanonicalFile()), "INVALID_BUNDLE");
+        read(original, null);
+        writeInternal(archive, sources, cover, original);
+    }
+
+    private static void writeInternal(File archive, List<Source> sources, byte[] cover, File original) throws Exception {
+        Map<String, ZipEntry> metadata = new HashMap<>();
+        String comment = null;
+        if (original != null) try (ZipFile previous = new ZipFile(original)) {
+            comment = previous.getComment();
+            Enumeration<? extends ZipEntry> items = previous.entries();
+            while (items.hasMoreElements()) { ZipEntry entry = items.nextElement(); metadata.put(entry.getName(), entry); }
+        }
         require(!sources.isEmpty() && sources.size() <= ShareWire.MAX_FILES, "INVALID_FILE");
         require(cover == null || PreviewImages.validated(cover).length > 0, "INVALID_BUNDLE");
         List<Entry> entries = new ArrayList<>();
@@ -60,11 +80,12 @@ public final class ContentBundle {
         long total = 0;
         try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(archive)))) {
             zip.setLevel(Deflater.NO_COMPRESSION);
+            if (comment != null) zip.setComment(comment);
             for (Source source : sources) {
                 long limit = Math.min(ShareWire.MAX_FILE, ShareWire.MAX_TOTAL - total);
                 require(ShareWire.validPath(source.path) && paths.add(ShareWire.pathKey(source.path)) &&
                         (source.size == -1 || source.size > 0 && source.size <= limit), "INVALID_FILE");
-                zip.putNextEntry(new ZipEntry(source.path));
+                zip.putNextEntry(entryMetadata(source.path, metadata));
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
                 long size;
                 try (InputStream input = source.open.input()) {
@@ -77,11 +98,11 @@ public final class ContentBundle {
                 entries.add(new Entry(source.path, size, digest.digest()));
             }
             if (cover != null) {
-                zip.putNextEntry(new ZipEntry(COVER_FILE));
+                zip.putNextEntry(entryMetadata(COVER_FILE, metadata));
                 zip.write(cover);
                 zip.closeEntry();
             }
-            zip.putNextEntry(new ZipEntry(MANIFEST));
+            zip.putNextEntry(entryMetadata(MANIFEST, metadata));
             DataOutputStream index = new DataOutputStream(zip);
             index.writeUTF(cover == null ? VERSION : VERSION_WITH_COVER);
             index.writeInt(entries.size());
@@ -97,6 +118,16 @@ public final class ContentBundle {
             zip.closeEntry();
         }
         read(archive, null);
+    }
+
+    private static ZipEntry entryMetadata(String path, Map<String, ZipEntry> metadata) {
+        ZipEntry entry = new ZipEntry(path), previous = metadata.get(path);
+        if (previous != null) {
+            if (previous.getTime() >= 0) entry.setTime(previous.getTime());
+            if (previous.getComment() != null) entry.setComment(previous.getComment());
+            // ZIP64 and timestamp extras depend on rewritten bytes; preserve only portable comment/time.
+        }
+        return entry;
     }
 
     public static int unpack(File archive, File directory) throws Exception {

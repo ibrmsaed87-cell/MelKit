@@ -37,7 +37,18 @@ public final class NewFileRestore {
 
     private static String restoreNew(File gameRoot, String path, InputStream source,
             long expectedBytes, String expectedSha, boolean asCopy) throws Exception {
-        if (!supported(path) || expectedBytes < 0 || expectedSha == null
+        return restoreScoped(gameRoot, path, source, expectedBytes, expectedSha, asCopy, false);
+    }
+
+    /** Quarantine recovery only: permits unknown extensions inside the same scoped content folders. */
+    static void restoreQuarantined(File gameRoot, String path, InputStream source,
+            long expectedBytes, String expectedSha) throws Exception {
+        restoreScoped(gameRoot, path, source, expectedBytes, expectedSha, false, true);
+    }
+
+    private static String restoreScoped(File gameRoot, String path, InputStream source,
+            long expectedBytes, String expectedSha, boolean asCopy, boolean quarantine) throws Exception {
+        if ((!quarantine && !supported(path)) || expectedBytes < 0 || expectedSha == null
                 || !expectedSha.matches("[a-f0-9]{64}")) throw new SecurityException("Invalid restore request");
         if (!gameRoot.isDirectory()) throw new IOException("Game folder missing");
         ContentPaths paths = new ContentPaths(gameRoot);

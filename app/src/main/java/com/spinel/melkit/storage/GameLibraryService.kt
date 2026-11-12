@@ -270,6 +270,21 @@ class GameLibraryService : IGameLibrary.Stub() {
                     }
                     JSONObject().put("moved", moved.length()).put("paths", moved).put("status", status)
                 }
+                "file_backup", "file_rename", "file_delete", "file_quarantine" -> {
+                    val found = currentScan(storageRoot, request) ?: return scanStatus("expired")
+                    val finding = found.findings[request.getInt("index")]
+                    val engine = FileScan(gameRoot, GamePreviewReader::validJsonObject)
+                    val backups = File(File(storageRoot).canonicalFile, "Download/MelKit/ScanBackups")
+                    if (action != "file_backup" && isModPath(finding.path)) checkModRecovery(storageRoot)
+                    val output = when (action) {
+                        "file_backup" -> ScanFileActions.backup(engine, finding, backups).path
+                        "file_rename" -> ScanFileActions.rename(gameRoot, engine, finding, request.getString("name"), backups)
+                        "file_delete" -> ScanFileActions.delete(engine, finding, backups).path
+                        else -> { engine.quarantineExplicit(finding, quarantineVault(storageRoot, gameRoot)); finding.path }
+                    }
+                    if (action != "file_backup") scanResult = null
+                    JSONObject().put("path", output)
+                }
                 "restore" -> {
                     val quarantine = quarantineVault(storageRoot, gameRoot)
                     val id = request.getString("id")

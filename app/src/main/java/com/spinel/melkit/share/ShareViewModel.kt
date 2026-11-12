@@ -52,7 +52,9 @@ internal data class SharePage(val queue: List<ShareInput> = emptyList(), val rec
     val restoreSelection: Set<String> = emptySet(), val batchRestore: BatchRestore.Snapshot? = null,
     val draftCover: Bitmap? = null, val receivedCover: Bitmap? = null, val draftName: String = "",
     val preflight: Map<String, String> = emptyMap(), val contentWarnings: Map<String, String> = emptyMap(),
-    val duplicateContent: Map<String, String> = emptyMap(), val exportResults: Map<String, String> = emptyMap())
+    val duplicateContent: Map<String, String> = emptyMap(), val exportResults: Map<String, String> = emptyMap(),
+    val openedUri: Uri? = null, val openedName: String = "", val editorId: String? = null,
+    val editing: Boolean = false, val dirty: Boolean = false, val sourceWritable: Boolean = false)
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application
@@ -61,6 +63,71 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     val state = mutableState.asStateFlow()
     val transfer = MelKitShareService.state
     private val catalog = SavedBundleStore(application)
+    private val documentWriter = BundleDocumentWriter(application)
+    private var editorDirectory: File? = null
+    private var editorOriginal: File? = null
+    fun canReplaceWithoutFolder() = state.value.openedUri?.scheme == "file"
+    fun editOpenedBundle() { state.value.openedUri?.let { editBundle(it, state.value.openedName) } }
+    fun editSavedBundle(item: SavedBundle) = editBundle(item.uri, item.name)
+    private fun editBundle(uri: Uri, name: String) = run {
+        val draft = runInterruptible(Dispatchers.IO) {
+            val directory = File(context.cacheDir, "bundle-editor-" + UUID.randomUUID())
+            check(directory.mkdirs()) { "SAVE_FAILED" }
+            try {
+                val original = File(directory, "original.zip")
+                openSource(uri).use { input -> original.outputStream().use { ContentBundle.copy(input, it, ContentBundle.MAX_ARCHIVE, null) } }
+                val contents = File(directory, "contents")
+                ContentBundle.unpack(original, contents)
+                val inputs = contents.walkTopDown().filter { it.isFile && ShareWire.validPath(it.relativeTo(contents).invariantSeparatorsPath) }.map { file ->
+                    val hash = BundleDocumentWriter.hash(file)
+                    ShareInput(file.relativeTo(contents).invariantSeparatorsPath, file.length(), open = { file.inputStream() },
+                        verifySource = { check(MessageDigest.isEqual(hash, BundleDocumentWriter.hash(file))) { "FILE_CHANGED" } })
+                }.toList()
+                Triple(directory, original, inputs)
+            } catch (error: Exception) { directory.deleteRecursively(); throw error }
+        }
+        editorDirectory?.deleteRecursively()
+        editorDirectory = draft.first; editorOriginal = draft.second
+        val cover = withContext(Dispatchers.IO) {
+            val image = File(draft.first, "contents/" + ContentBundle.COVER_FILE)
+            if (image.length() in 1..PreviewImages.MAX_IMAGE_BYTES.toLong()) PreviewBitmap.decode(image.readBytes()) else null
+        }
+        val writable = withContext(Dispatchers.IO) { documentWriter.writable(uri) }
+        mutableState.update { it.copy(queue = draft.third, openedUri = uri, openedName = name,
+            draftName = name.removeSuffix(".zip"), draftCover = cover, bundleUri = null,
+            editorId = UUID.randomUUID().toString(), editing = true, dirty = false, sourceWritable = writable) }
+    }
+    fun saveEditedBundle(tree: Uri? = null) = run {
+        val page = state.value
+        val original = editorOriginal ?: throw IOException("SOURCE_ACCESS")
+        val source = page.openedUri ?: throw IOException("SOURCE_ACCESS")
+        val name = page.draftName.trim().removeSuffix(".zip") + ".zip"
+        val result = runInterruptible(Dispatchers.IO) {
+            tree?.let { catalog.retain(it) }
+            withBundleArchive { archive ->
+                writeDraft(archive, page.queue, page.draftCover)
+                val uri = documentWriter.replace(source, original, archive, name, tree)
+                // Refresh the snapshot only after replacement is verified.
+                archive.copyTo(original, overwrite = true)
+                mutableState.update { it.copy(openedUri = uri) }
+                val item = catalog.add(uri, name, archive.length(), page.queue.map { it.path }, page.draftCover, previous = source)
+                catalog.forget(source, uri)
+                mutableBundles.value = catalog.read()
+                uri to item.name
+            }
+        }
+        mutableState.update { it.copy(openedUri = result.first, openedName = result.second, dirty = false) }
+        AdManager.get(context).afterTask(AdPlacement.BUNDLE) {
+            mutableState.update { it.copy(bundleUri = result.first, bundleName = result.second, bundleStatus = "saved") }
+        }
+    }
+    private fun writeDraft(archive: File, queue: List<ShareInput>, cover: Bitmap?) {
+        val sources = queue.map { input -> ContentBundle.Source(input.path, input.size, { input.open() }, { input.verifySource() }) }
+        val original = editorOriginal
+        val image = cover?.let(CoverPhoto::encode)
+        if (state.value.editing && original != null) ContentBundle.writeEdited(archive, original, sources, image)
+        else ContentBundle.write(archive, sources, image)
+    }
     private val mutableBundles = MutableStateFlow<List<SavedBundle>>(emptyList())
     val savedBundles = mutableBundles.asStateFlow()
     init { refreshBundles() }
@@ -84,14 +151,13 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 unpackBundle(archive)
             }
         }
-        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified", openedUri = item.uri, openedName = item.name) }
     }
-    fun shareSavedBundle(activity: Context, item: SavedBundle) = run {
-        withContext(Dispatchers.IO) { catalog.available(item) }
-        shareUri(activity, item.uri, "application/zip", item.name)
+    fun prepareBundleShare(item: SavedBundle) {
+        if (!state.value.busy) mutableState.update { it.copy(bundleUri = item.uri, bundleName = item.name) }
     }
-    fun bundleName(name: String) { mutableState.update { it.copy(draftName = name.take(120), bundleUri = null) } }
-    fun clearSelection() { if (!state.value.busy) mutableState.update { it.copy(queue = emptyList(), bundleUri = null) } }
+    fun bundleName(name: String) { mutableState.update { it.copy(draftName = name.take(120), bundleUri = null, dirty = true) } }
+    fun clearSelection() { if (!state.value.busy) mutableState.update { it.copy(queue = emptyList(), bundleUri = null, dirty = true) } }
 
     private var resetWhenIdle = false
     private var activeRestore: BatchRestore? = null
@@ -133,6 +199,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         if (mutableState.value.busy) { activeRestore?.requestStop(); resetWhenIdle = true; return }
         resetWhenIdle = false
         // Session state only. Published Downloads and verified received files remain on disk.
+        editorDirectory?.deleteRecursively(); editorDirectory = null; editorOriginal = null
         mutableState.value = SharePage()
     }
 
@@ -140,7 +207,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         clearFeedback()
         val key = ShareWire.pathKey(path)
         mutableState.update { it.copy(queue = it.queue.filterNot { item -> ShareWire.pathKey(item.path) == key },
-            issue = null, bundleUri = null) }
+            issue = null, bundleUri = null, dirty = true) }
     }
 
     private fun add(input: ShareInput) {
@@ -151,7 +218,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
             !ShareWire.validPath(input.path) || input.size == 0L || input.size > ShareWire.MAX_FILE -> issue("INVALID_FILE")
             queue.any { ShareWire.pathKey(it.path) == key } -> issue("DUPLICATE_NAME")
             queue.size >= ShareWire.MAX_FILES -> issue("LIMIT")
-            else -> mutableState.update { it.copy(queue = it.queue + input, bundleUri = null) }
+            else -> mutableState.update { it.copy(queue = it.queue + input, bundleUri = null, dirty = true) }
         }
     }
 
@@ -195,10 +262,11 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
 
     fun setBundleCover(cover: Bitmap?) {
         clearFeedback()
-        mutableState.update { it.copy(draftCover = cover, bundleUri = null) }
+        mutableState.update { it.copy(draftCover = cover, bundleUri = null, dirty = true) }
     }
 
     fun saveBundle(destination: Uri) = run {
+        check(destination != state.value.openedUri) { "BUNDLE_SAVE_NEW_REQUIRED" }
         var archiveBytes = 0L
         val queue = mutableState.value.queue
         val cover = mutableState.value.draftCover
@@ -206,9 +274,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         runInterruptible(Dispatchers.IO) {
             try {
                 withBundleArchive { archive ->
-                    ContentBundle.write(archive, queue.map { input ->
-                        ContentBundle.Source(input.path, input.size, { input.open() }, { input.verifySource() })
-                    }, cover?.let(CoverPhoto::encode))
+                    writeDraft(archive, queue, cover)
                     val size = archive.length()
                     archiveBytes = size
                     val written = MessageDigest.getInstance("SHA-256")
@@ -232,7 +298,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         } catch (error: Exception) { throw IOException("CATALOG_FAILED", error) }
         val name = item.name
         AdManager.get(context).afterTask(AdPlacement.BUNDLE) {
-            mutableState.update { it.copy(bundleUri = destination, bundleStatus = "saved", bundleName = name) }
+            mutableState.update { it.copy(bundleUri = destination, bundleStatus = "saved", bundleName = name, dirty = false) }
         }
     }
 
@@ -247,14 +313,35 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
                 unpackBundle(archive)
             }
         }
-        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified", openedUri = uri,
+            openedName = runCatching { catalog.metadata(uri).first }.getOrDefault("MelKit-Bundle.zip")) }
+    }
+
+    fun saveReceivedBundle(item: ReceivedFile, destination: Uri) = run {
+        val paths = runInterruptible(Dispatchers.IO) {
+            ContentBundle.verify(item.file)
+            val hash = BundleDocumentWriter.hash(item.file)
+            item.file.inputStream().use { input ->
+                (context.contentResolver.openOutputStream(destination, "wt") ?: throw IOException("SAVE_FAILED")).use {
+                    ContentBundle.copy(input, it, ContentBundle.MAX_ARCHIVE, null)
+                }
+            }
+            val readHash = MessageDigest.getInstance("SHA-256")
+            openSource(destination).use { ContentBundle.copy(it, null, ContentBundle.MAX_ARCHIVE, readHash) }
+            check(MessageDigest.isEqual(hash, readHash.digest())) { "CHECKSUM" }
+            java.util.zip.ZipFile(item.file).use { zip -> zip.entries().asSequence().map { it.name }.filter(ShareWire::validPath).toList() }
+        }
+        withContext(Dispatchers.IO) { catalog.add(destination, item.file.name, item.bytes, paths, null); mutableBundles.value = catalog.read() }
+        AdManager.get(context).afterTask(AdPlacement.BUNDLE) {
+            mutableState.update { it.copy(bundleStatus = "saved", bundleUri = destination, bundleName = item.file.name) }
+        }
     }
 
     fun openReceivedBundle(item: ReceivedFile) = run {
         mutableState.update { it.copy(bundleBatch = null, receivedCover = null, restoreSelection = emptySet(), preflight = emptyMap(), received = emptyList()) }
         val id = UUID.nameUUIDFromBytes("melkit-received-bundle:${item.batch}:${item.path}".toByteArray()).toString()
         val (batch, cover) = runInterruptible(Dispatchers.IO) { unpackBundle(item.file, id) }
-        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified") }
+        mutableState.update { it.copy(bundleBatch = batch, receivedCover = cover, bundleStatus = "verified", openedUri = Uri.fromFile(item.file), openedName = item.file.name) }
     }
 
     private fun unpackBundle(archive: File, id: String = UUID.randomUUID().toString()): Pair<String, Bitmap?> {
@@ -297,11 +384,6 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     private fun <T> withBundleArchive(task: (File) -> T): T {
         val archive = File.createTempFile("melkit-bundle-", ".zip", context.cacheDir)
         try { return task(archive) } finally { archive.delete() }
-    }
-
-    fun shareBundle(activity: Context, uri: Uri) {
-        clearFeedback()
-        runCatching { shareUri(activity, uri, "application/zip", "MelKit") }.onFailure { issue("IO") }
     }
 
     fun sendBundle(activity: Context, uri: Uri) = run {

@@ -82,12 +82,16 @@ def main():
                         emit("ARTIFACTS_URL=" + job["web_url"] + "/artifacts/download")
                         report = request("/jobs/" + str(job["id"]) + "/artifacts/build/reports/melkit-build.txt", raw=True)
                         for line in report.splitlines():
-                            if line.startswith(("Package:", "Version code:", "Signing certificate SHA-256:", "Live AdMob units:")):
+                            if line.startswith(("Package:", "Version code:", "Signing certificate SHA-256:", "Live AdMob units:", "Source commit:", "BuildConfig.TEST_ADS:")):
                                 emit(line)
                             elif re.fullmatch(r"[a-f0-9]{64}\s+app/build/outputs/apk/release/[A-Za-z0-9_.-]+\.apk", line):
                                 digest, path = line.split()
                                 emit("APK_SHA256=" + digest)
                                 emit("APK_URL=" + job["web_url"] + "/artifacts/raw/" + path)
+                            elif re.fullmatch(r"[a-f0-9]{64}\s+app/build/outputs/bundle/release/[A-Za-z0-9_.-]+\.aab", line):
+                                digest, path = line.split()
+                                emit("AAB_SHA256=" + digest)
+                                emit("AAB_URL=" + job["web_url"] + "/artifacts/raw/" + path)
                 return 0 if status == "success" and any(job["name"] == "build_signed_apk" and job["status"] == "success" for job in jobs) else 1
         except urllib.error.HTTPError as error:
             if error.code in (401, 403, 404):

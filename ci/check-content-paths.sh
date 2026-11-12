@@ -14,6 +14,7 @@ javac -encoding UTF-8 -d "$melkit_test_dir" \
   app/src/main/java/com/spinel/melkit/storage/ModVault.java \
   app/src/main/java/com/spinel/melkit/storage/ModProfiles.java \
   app/src/main/java/com/spinel/melkit/storage/FileScan.java \
+  app/src/main/java/com/spinel/melkit/storage/ScanFileActions.java \
   app/src/main/java/com/spinel/melkit/share/ShareWire.java \
   app/src/main/java/com/spinel/melkit/share/ContentBundle.java \
   app/src/main/java/com/spinel/melkit/share/BatchRestore.java \

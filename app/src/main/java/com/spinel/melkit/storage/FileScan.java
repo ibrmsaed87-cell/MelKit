@@ -236,6 +236,19 @@ public final class FileScan {
         }
     }
 
+    /** Fresh metadata/hash check before any user-requested file action. Unknown is never invalid. */
+    public File verifiedFile(Finding finding) throws Exception {
+        File file = scoped(finding.path);
+        if (!file.isFile() || file.length() != finding.bytes || file.lastModified() != finding.modified) throw new ModVault.Changed();
+        if (finding.hash != null && !finding.hash.equals(ModVault.hash(file, finding.bytes))) throw new ModVault.Changed();
+        return file;
+    }
+
+    public void quarantineExplicit(Finding finding, ModVault vault) throws Exception {
+        verifiedFile(finding);
+        vault.disable(finding.path, finding.bytes, finding.modified, finding.hash);
+    }
+
     public void quarantine(Finding finding, ModVault vault) throws Exception {
         if (!finding.selectable) throw new SecurityException("Finding cannot be quarantined");
         if (!finding.reference.isEmpty()) {

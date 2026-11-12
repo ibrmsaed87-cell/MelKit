@@ -25,7 +25,8 @@ data class ScanRequest(val indices: List<Int> = emptyList(), val file: Quarantin
 
 data class FileScanState(val tab: Int = 0, val busy: Boolean = false, val scan: ScanPage? = null,
     val vault: QuarantinePage? = null, val selection: Set<Int> = emptySet(), val request: ScanRequest? = null,
-    val issue: String? = null, val moved: Int = 0, val restored: Boolean = false)
+    val issue: String? = null, val moved: Int = 0, val restored: Boolean = false,
+    val actionDone: String? = null, val actionPath: String? = null)
 
 class FileScanViewModel : ViewModel() {
     private val mutableState = MutableStateFlow(FileScanState())
@@ -41,7 +42,7 @@ class FileScanViewModel : ViewModel() {
 
     private fun run(block: suspend () -> Unit) {
         if (mutableState.value.busy) return
-        mutableState.update { it.copy(busy = true, issue = null, moved = 0, restored = false) }
+        mutableState.update { it.copy(busy = true, issue = null, moved = 0, restored = false, actionDone = null, actionPath = null) }
         viewModelScope.launch {
             try {
                 block()
@@ -148,6 +149,16 @@ class FileScanViewModel : ViewModel() {
                 if (moved == request.indices.size && request.indices.isNotEmpty()) library.adBreak(com.spinel.melkit.ads.AdPlacement.CLEAN, publish)
                 else publish()
             }
+        }
+    }
+
+    fun fileAction(library: GameLibraryViewModel, entry: ScanFinding, action: String, name: String = "") {
+        val token = state.value.scan?.token ?: return
+        run {
+            val response = checked(library.scanFiles(action, JSONObject().put("token", token)
+                .put("index", entry.index).put("name", name)))
+            mutableState.update { it.copy(actionDone = action, actionPath = response.optString("path"),
+                scan = if (action == "file_backup") it.scan else null, selection = emptySet(), vault = null) }
         }
     }
 

@@ -421,6 +421,23 @@
     <string name="backup_created">تاريخ الإنشاء: %1$s</string>
     <string name="backup_modified">تاريخ التعديل: %1$s</string>
     <string name="file_delete">حذف الملف</string>
+    <string name="scan_quarantine_one">عزل الملف (موصى به)</string>
+    <string name="scan_backup_one">حفظ نسخة احتياطية</string>
+    <string name="scan_action_success">اكتملت العملية وتم التحقق منها: %1$s</string>
+    <string name="scan_delete_confirm">هل تريد حذف هذا الملف من اللعبة؟ ستُحفظ نسخة أمان موثقة في Download/MelKit/ScanBackups. العزل هو الخيار الموصى به ويمكن التراجع عنه.</string>
+    <string name="scan_name_stem">الاسم دون الامتداد</string>
+    <string name="scan_extension_kept">سيُحفظ الامتداد الأصلي. لن يُستبدل أي ملف موجود بالاسم نفسه.</string>
+    <string name="bundle_edit">تعديل الحزمة</string>
+    <string name="bundle_share_melkit">مشاركة عبر MelKit</string>
+    <string name="bundle_edit_help">أضف ملفات من تعديل الاختيار، أو أزلها من هذه المعاينة. تبقى ملفات اللعبة الأصلية محفوظة.</string>
+    <string name="bundle_save_changes">حفظ التعديلات</string>
+    <string name="bundle_save_as_new">حفظ كحزمة جديدة</string>
+    <string name="bundle_read_only">لا يمكن استبدال هذا المصدر بأمان. استخدم حفظ كحزمة جديدة في مكان قابل للكتابة.</string>
+    <string name="bundle_choose_parent">اختر المجلد الذي يحتوي على ZIP الأصلي للسماح باستبداله بعد التحقق. تبقى الحزمة السابقة باسم MelKit-before-edit-….zip. إذا لم يدعم موفر الملفات ذلك، استخدم حفظ كحزمة جديدة.</string>
+    <string name="bundle_discard_title">تعديلات حزمة غير محفوظة</string>
+    <string name="bundle_discard_body">هل تريد تجاهل هذه التعديلات ومغادرة المحرر؟ تبقى الحزمة الأصلية وملفات اللعبة محفوظة.</string>
+    <string name="bundle_discard">تجاهل التعديلات</string>
+    <string name="bundle_keep_editing">متابعة التعديل</string>
 </resources>
 
 

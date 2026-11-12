@@ -428,6 +428,23 @@
     <string name="backup_created">Created: %1$s</string>
     <string name="backup_modified">Modified: %1$s</string>
     <string name="file_delete">Delete File</string>
+    <string name="scan_quarantine_one">Quarantine file (recommended)</string>
+    <string name="scan_backup_one">Save a backup copy</string>
+    <string name="scan_action_success">Completed and verified: %1$s</string>
+    <string name="scan_delete_confirm">Delete this game file? A verified safety copy is kept in Download/MelKit/ScanBackups. Quarantine is the recommended reversible option.</string>
+    <string name="scan_name_stem">Name without extension</string>
+    <string name="scan_extension_kept">The original extension is kept. An existing filename will never be replaced.</string>
+    <string name="bundle_edit">Edit bundle</string>
+    <string name="bundle_share_melkit">Share via MelKit</string>
+    <string name="bundle_edit_help">Add files with Edit selection, or remove them from this preview. Game originals are preserved.</string>
+    <string name="bundle_save_changes">Save changes</string>
+    <string name="bundle_save_as_new">Save as a new bundle</string>
+    <string name="bundle_read_only">This source cannot be replaced safely. Save as a new bundle in a writable location.</string>
+    <string name="bundle_choose_parent">Choose the folder containing the original ZIP to allow a verified replacement. The previous ZIP is kept as MelKit-before-edit-….zip. If the provider does not support this, save as a new bundle.</string>
+    <string name="bundle_discard_title">Unsaved bundle changes</string>
+    <string name="bundle_discard_body">Discard these edits and leave the editor? The original bundle and game files are preserved.</string>
+    <string name="bundle_discard">Discard edits</string>
+    <string name="bundle_keep_editing">Keep editing</string>
 </resources>
 
 

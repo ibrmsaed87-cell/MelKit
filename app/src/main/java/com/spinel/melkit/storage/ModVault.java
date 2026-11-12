@@ -46,7 +46,8 @@ public final class ModVault {
     }
 
     static ModVault forQuarantine(File gameRoot, File vaultRoot) throws IOException {
-        return new ModVault(gameRoot, vaultRoot, File::getUsableSpace, NewFileRestore::supported, "content.bin");
+        return new ModVault(gameRoot, vaultRoot, File::getUsableSpace,
+                path -> path != null && path.contains("/"), "content.bin");
     }
 
     private ModVault(File gameRoot, File vaultRoot, SpaceProbe space, Predicate<String> supported,
@@ -242,7 +243,8 @@ public final class ModVault {
             while (space != null && !space.exists()) space = space.getParentFile();
             if (space == null || r.bytes > Long.MAX_VALUE - 1048576L || this.space.available(space) < r.bytes + 1048576L) throw new NoSpace();
             try (InputStream input = new FileInputStream(payload)) {
-                NewFileRestore.restore(gameRoot, r.path, input, r.bytes, r.hash);
+                if (payloadName.equals("content.bin")) NewFileRestore.restoreQuarantined(gameRoot, r.path, input, r.bytes, r.hash);
+                else NewFileRestore.restore(gameRoot, r.path, input, r.bytes, r.hash);
             }
         }
         verify(contentFile(r.path), r);

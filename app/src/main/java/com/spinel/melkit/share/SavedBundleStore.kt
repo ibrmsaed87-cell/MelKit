@@ -43,28 +43,41 @@ internal class SavedBundleStore(private val context: Context) {
     }
 
     fun retain(uri: Uri): Boolean {
+        if (uri.scheme == "file") return runCatching { ownedFile(uri).isFile }.getOrDefault(false)
         runCatching { resolver.takePersistableUriPermission(uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
         if (resolver.persistedUriPermissions.none { it.uri == uri && it.isReadPermission }) runCatching {
             resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        return resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+        return resolver.persistedUriPermissions.any { permission -> permission.isReadPermission &&
+            (permission.uri == uri || runCatching {
+                DocumentsContract.isTreeUri(uri) && permission.uri.authority == uri.authority &&
+                    DocumentsContract.getTreeDocumentId(permission.uri) == DocumentsContract.getTreeDocumentId(uri)
+            }.getOrDefault(false)) }
+
     }
 
-    fun add(uri: Uri, fallbackName: String, bytes: Long, paths: List<String>, cover: Bitmap?): SavedBundle {
+    fun add(uri: Uri, fallbackName: String, bytes: Long, paths: List<String>, cover: Bitmap?, previous: Uri? = null): SavedBundle {
         val persistent = retain(uri)
         val name = metadata(uri).first.ifBlank { fallbackName }
-        val item = SavedBundle(UUID.randomUUID().toString(), uri, name, System.currentTimeMillis(), bytes,
+        val existing = read().firstOrNull { it.uri == uri || (previous != null && it.uri == previous) }
+        val item = SavedBundle(existing?.id ?: UUID.randomUUID().toString(), uri, name, existing?.created ?: System.currentTimeMillis(), bytes,
             paths.size, paths.map { it.substringBefore('/') }.distinct(), persistent)
-        write(read().filterNot { it.uri == uri } + item)
+        write(read().filterNot { it.uri == uri || (previous != null && it.uri == previous) } + item)
         if (cover != null) runCatching {
             check(covers.isDirectory || covers.mkdirs())
             File(covers, item.id + ".png").writeBytes(CoverPhoto.encode(cover))
-        }
+        } else File(covers, item.id + ".png").delete()
         return item
     }
 
-    fun metadata(uri: Uri): Pair<String, Long> = resolver.query(uri,
+    fun forget(previous: Uri, current: Uri) {
+        if (previous != current) write(read().filterNot { it.uri == previous })
+    }
+
+    fun metadata(uri: Uri): Pair<String, Long> = if (uri.scheme == "file") {
+        val file = File(requireNotNull(uri.path)); file.name to file.length()
+    } else resolver.query(uri,
         arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use {
         if (!it.moveToFirst()) throw IOException("BUNDLE_UNAVAILABLE")
         it.getString(0).orEmpty() to if (it.isNull(1)) -1L else it.getLong(1)
@@ -79,7 +92,14 @@ internal class SavedBundleStore(private val context: Context) {
         val name = requested.trim().removeSuffix(".zip")
         require(name.isNotEmpty() && name.length <= 120 && name.none { it == '/' || it == '\\' || it.code < 32 }) { "INVALID_NAME" }
         available(item)
-        val uri = DocumentsContract.renameDocument(resolver, item.uri, "$name.zip") ?: throw IOException("RENAME_FAILED")
+        val uri = if (item.uri.scheme == "file") {
+            val file = ownedFile(item.uri)
+            check(file.parentFile!!.listFiles().orEmpty().none { it.name.equals("$name.zip", true) }) { "DUPLICATE_NAME" }
+            val target = File(file.parentFile, "$name.zip")
+            check(target.createNewFile()) { "DUPLICATE_NAME" }
+            if (!file.renameTo(target)) { target.delete(); throw IOException("RENAME_FAILED") }
+            Uri.fromFile(target)
+        } else DocumentsContract.renameDocument(resolver, item.uri, "$name.zip") ?: throw IOException("RENAME_FAILED")
         val updated = item.copy(uri = uri, name = metadata(uri).first, persistent = retain(uri))
         write(read().map { if (it.id == item.id) updated else it })
     }
@@ -87,11 +107,18 @@ internal class SavedBundleStore(private val context: Context) {
     /** Called only from the explicit UI confirmation for this exact document. */
     fun delete(item: SavedBundle) {
         available(item)
-        check(DocumentsContract.deleteDocument(resolver, item.uri)) { "DELETE_FAILED" }
+        check(if (item.uri.scheme == "file") ownedFile(item.uri).delete()
+            else DocumentsContract.deleteDocument(resolver, item.uri)) { "DELETE_FAILED" }
         write(read().filterNot { it.id == item.id })
         File(covers, item.id + ".png").delete()
         runCatching { resolver.releasePersistableUriPermission(item.uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+    }
+
+    private fun ownedFile(uri: Uri): File {
+        val file = File(requireNotNull(uri.path)).canonicalFile
+        check(file.path.startsWith(MelKitShareService.receivedDirectory(context).canonicalPath + File.separator)) { "PERMISSION" }
+        return file
     }
 
     fun cover(item: SavedBundle): Bitmap? = runCatching {

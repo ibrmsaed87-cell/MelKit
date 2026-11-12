@@ -124,6 +124,27 @@ public final class ContentBundleCheck {
             changeCover(covered, forged);
             rejects("CHECKSUM", () -> ContentBundle.unpack(forged.toFile(), invalid.toFile()));
             check(!Files.exists(invalid), "A changed cover leaves no partial bundle");
+            Path originalEdit = temp.resolve("original-edit.zip"), edited = temp.resolve("edited.zip");
+            ContentBundle.write(originalEdit.toFile(), List.of(source(modPath, mod.length, mod), source(savePath, save.length, save)), cover);
+            byte[] originalBytes = Files.readAllBytes(originalEdit);
+            ContentBundle.writeEdited(edited.toFile(), originalEdit.toFile(), List.of(source(savePath, save.length, save),
+                    source("Worlds/جديد.melworld", mod.length, mod)), cover);
+            Path editedOpen = temp.resolve("edited-open");
+            check(ContentBundle.unpack(edited.toFile(), editedOpen.toFile()) == 2, "Edited mixed bundle reopens");
+            check(!Files.exists(editedOpen.resolve(modPath)), "Removed file is absent only from edited bundle");
+            check(Arrays.equals(Files.readAllBytes(editedOpen.resolve(savePath)), save), "Retained file bytes preserved by edit");
+            check(Arrays.equals(Files.readAllBytes(editedOpen.resolve("Worlds/جديد.melworld")), mod), "Added Unicode path reopens");
+            check(Arrays.equals(Files.readAllBytes(editedOpen.resolve(ContentBundle.COVER_FILE)), cover), "Existing cover is preserved");
+            check(Arrays.equals(originalBytes, Files.readAllBytes(originalEdit)), "Edit leaves original ZIP byte-identical");
+            rejects("INVALID_BUNDLE", () -> ContentBundle.writeEdited(originalEdit.toFile(), originalEdit.toFile(), sources, cover));
+            check(Arrays.equals(originalBytes, Files.readAllBytes(originalEdit)), "Direct original truncation is rejected");
+            rejects("INVALID_FILE", () -> ContentBundle.writeEdited(edited.toFile(), originalEdit.toFile(), List.of(
+                    source(savePath, save.length, save), source("saves/save.melsave", save.length, save)), cover));
+            check(Arrays.equals(originalBytes, Files.readAllBytes(originalEdit)), "Duplicate edit paths cannot damage original");
+            ContentBundle.writeEdited(edited.toFile(), originalEdit.toFile(), sources, null);
+            Path removedCover = temp.resolve("removed-cover");
+            ContentBundle.unpack(edited.toFile(), removedCover.toFile());
+            check(!Files.exists(removedCover.resolve(ContentBundle.COVER_FILE)), "Removing cover produces compatible v1 bundle");
         } finally {
             ShareWire.deleteTree(temp.toFile());
         }

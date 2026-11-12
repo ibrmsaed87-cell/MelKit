@@ -169,6 +169,8 @@ fun MelKitApp(shareRequest: Int = 0) {
     val transfer by MelKitShareService.state.collectAsState()
     val organization: LibraryOrganizationViewModel = viewModel()
     val labels by organization.labels.collectAsState()
+    var nestedBack by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    var pendingRoute by remember { mutableStateOf<String?>(null) }
     var route by rememberSaveable { mutableStateOf("home") }
     var parent by rememberSaveable { mutableStateOf("home") }
     var toolsTab by rememberSaveable { mutableIntStateOf(0) }
@@ -205,12 +207,18 @@ fun MelKitApp(shareRequest: Int = 0) {
     val root = destinations.any { it.route == route }
     val selectedRoot = if (root) route else parent
     LaunchedEffect(route) {
-        if (route != "bundles") bundleModel.closeBundleSession()
         if (route != "share") shareModel.stopRestore()
     }
     val navigate: (String) -> Unit = { target ->
-        if (destinations.any { it.route == route }) parent = route
-        route = target
+        val draft = if (route == "bundles") bundlePage else sharePage
+        if (target != route && (route == "bundles" || (route == "share" && draft.editing)) && draft.dirty) pendingRoute = target
+        else {
+            if (destinations.any { it.route == route }) parent = route
+            route = target
+        }
+    }
+    val goBack: () -> Unit = {
+        if (nestedBack?.invoke() != true) navigate(if (root) "home" else parent)
     }
     val title = when (route) {
         "settings" -> R.string.settings
@@ -218,7 +226,7 @@ fun MelKitApp(shareRequest: Int = 0) {
         else -> features.find { it.route == route }?.title ?: R.string.app_name
     }
     BackHandler(enabled = route != "home") {
-        route = if (root) "home" else parent
+        goBack()
     }
 
     BackHandler(enabled = fileWork) {
@@ -240,7 +248,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                     if (!root) IconButton(enabled = !fileWork, onClick = {
                         if (route == "profiles" && profilesState.editor != null) {
                             if (!profilesState.busy && !libraryState.busy) profilesModel.closeEditor()
-                        } else route = parent
+                        } else goBack()
                     }) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
                     }
@@ -258,7 +266,7 @@ fun MelKitApp(shareRequest: Int = 0) {
                 destinations.forEach { item ->
                     NavigationBarItem(
                         selected = selectedRoot == item.route,
-                        enabled = !fileWork, onClick = { parent = item.route; route = item.route },
+                        enabled = !fileWork, onClick = { navigate(item.route) },
                         icon = { Icon(item.icon, null) },
                         label = { Text(stringResource(item.title), fontSize = 11.sp) },
                     )
@@ -281,9 +289,9 @@ fun MelKitApp(shareRequest: Int = 0) {
                 } else if (route == "scanner") {
                     FileScanScreen(scanState, scanModel, libraryModel, libraryState) { navigate("shizuku") }
                 } else if (route == "share") {
-                    DirectShareScreen(shareModel, libraryModel, libraryState, savedModel, savedState) { navigate("shizuku") }
+                    DirectShareScreen(shareModel, libraryModel, libraryState, savedModel, savedState, registerBack = { nestedBack = it }) { navigate("shizuku") }
                 } else if (route == "bundles") {
-                    DirectShareScreen(bundleModel, libraryModel, libraryState, savedModel, savedState, bundles = true) {
+                    DirectShareScreen(bundleModel, libraryModel, libraryState, savedModel, savedState, bundles = true, registerBack = { nestedBack = it }) {
                         navigate("shizuku")
                     }
                 } else if (route == "categories") {
@@ -319,6 +327,18 @@ fun MelKitApp(shareRequest: Int = 0) {
                 }
             }
         }
+    }
+    pendingRoute?.let { target ->
+        AlertDialog(onDismissRequest = { pendingRoute = null },
+            title = { Text(stringResource(R.string.bundle_discard_title)) },
+            text = { Text(stringResource(R.string.bundle_discard_body)) },
+            confirmButton = { TextButton(onClick = {
+                if (route == "bundles") bundleModel.closeBundleSession() else shareModel.closeBundleSession()
+                pendingRoute = null
+                if (destinations.any { it.route == route }) parent = route
+                route = target
+            }) { Text(stringResource(R.string.bundle_discard)) } },
+            dismissButton = { TextButton(onClick = { pendingRoute = null }) { Text(stringResource(R.string.bundle_keep_editing)) } })
     }
     libraryState.connectionNotice?.let { issue ->
         AlertDialog(onDismissRequest = libraryModel::dismissConnectionNotice,

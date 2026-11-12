@@ -126,12 +126,6 @@ internal fun LibraryScreen(state: GameLibraryState, model: GameLibraryViewModel,
         }
         item {
             Text(stringResource(R.string.library_readonly_notice), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedButton(onClick = onOrganize, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Icon(Icons.Outlined.Label, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.categories), Modifier.weight(1f))
-                Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(20.dp))
-            }
         }
         if (!state.connected) item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
