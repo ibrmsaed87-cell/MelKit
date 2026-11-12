@@ -73,8 +73,10 @@ internal class BundleDocumentWriter(private val context: Context) {
         val parent = DocumentsContract.buildDocumentUriUsingTree(folderTree, DocumentsContract.getTreeDocumentId(folderTree))
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(folderTree, DocumentsContract.getTreeDocumentId(folderTree))
         val sourceId = DocumentsContract.getDocumentId(source)
-        val siblings = resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
-            buildList { while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1)) }
+        val siblings: List<Pair<String, String>> = resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+            buildList<Pair<String, String>> {
+                while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+            }
         } ?: throw IOException("BUNDLE_FOLDER_REQUIRED")
         check(siblings.any { it.first == sourceId }) { "BUNDLE_FOLDER_REQUIRED" }
         check(siblings.none { it.first != sourceId && it.second.equals(name, true) }) { "DUPLICATE_NAME" }
