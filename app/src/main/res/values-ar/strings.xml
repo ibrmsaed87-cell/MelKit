@@ -438,6 +438,11 @@
     <string name="bundle_discard_body">هل تريد تجاهل هذه التعديلات ومغادرة المحرر؟ تبقى الحزمة الأصلية وملفات اللعبة محفوظة.</string>
     <string name="bundle_discard">تجاهل التعديلات</string>
     <string name="bundle_keep_editing">متابعة التعديل</string>
+    <string name="bundle_changes_saved">تم حفظ التعديلات في الحزمة الأصلية.</string>
+    <string name="bundle_original_backup">نسخة الحزمة الأصلية: %1$s</string>
+    <string name="bundle_backup_failed">تعذّر التحقق من نسخة الأمان. لم تتغير الحزمة الأصلية. يمكنك الحفظ كحزمة جديدة.</string>
+    <string name="bundle_update_restored">تعذّر حفظ التعديلات. الحزمة الأصلية سليمة أو تمت استعادتها. تعديلاتك ما زالت متاحة؛ جرّب الحفظ كحزمة جديدة.</string>
+    <string name="bundle_recovery_required">توقف موفر الملفات قبل اكتمال الاسترجاع. ملف ZIP الأصلي محفوظ في نسخة الأمان الموضحة أدناه. احتفظ بها واحفظ تعديلاتك كحزمة جديدة.</string>
 </resources>
 
 

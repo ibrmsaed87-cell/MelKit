@@ -1,8 +1,12 @@
 package com.spinel.melkit.share
 
+import android.content.ContentValues
+import android.os.Build
+import android.os.Environment
+import android.os.ParcelFileDescriptor
+import android.provider.MediaStore
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import android.system.Os
 import java.io.File
@@ -10,17 +14,24 @@ import java.io.IOException
 import java.security.MessageDigest
 import java.util.UUID
 
-/** Replace only after a verified sibling exists. Keep the previous ZIP as a recovery copy. */
+/** Uses the original granted URI; never asks for or derives a parent-directory permission. */
 internal class BundleDocumentWriter(private val context: Context) {
     private val resolver = context.contentResolver
-    private val recovery = context.getSharedPreferences("bundle_edit_recovery_v1", Context.MODE_PRIVATE)
+    var lastBackupPath: String? = null
+        private set
 
     fun writable(uri: Uri): Boolean = try {
         if (uri.scheme == "file") ownedFile(uri).canWrite()
-        else resolver.query(uri, arrayOf(Document.COLUMN_FLAGS), null, null, null)?.use {
-            it.moveToFirst() && (it.getInt(0) and Document.FLAG_SUPPORTS_RENAME) != 0 &&
-                (it.getInt(0) and Document.FLAG_SUPPORTS_WRITE) != 0
-        } ?: false
+        else if (uri.scheme != "content") false
+        else {
+            val allowsWrite = runCatching {
+                resolver.query(uri, arrayOf(Document.COLUMN_FLAGS), null, null, null)?.use { cursor ->
+                    !cursor.moveToFirst() || (cursor.getInt(0) and Document.FLAG_SUPPORTS_WRITE) != 0
+                } ?: true
+            }.getOrDefault(true)
+            // Non-truncating probe checks this app's actual grant, including MediaStore ownership.
+            allowsWrite && (resolver.openFileDescriptor(uri, "rw")?.use { true } ?: false)
+        }
     } catch (_: Exception) { false }
 
     private fun ownedFile(uri: Uri): File {
@@ -36,7 +47,8 @@ internal class BundleDocumentWriter(private val context: Context) {
             hash.digest()
         }
 
-    fun replace(source: Uri, original: File, edited: File, name: String, tree: Uri?): Uri {
+    fun replace(source: Uri, original: File, edited: File, name: String): Uri {
+        lastBackupPath = null
         check(writable(source)) { "BUNDLE_READ_ONLY" }
         check(name.isNotBlank() && name.length <= 124 && name.none { it == '/' || it == '\\' || it.code < 32 }) { "INVALID_NAME" }
         ContentBundle.verify(edited)
@@ -49,6 +61,7 @@ internal class BundleDocumentWriter(private val context: Context) {
             val backup = File(file.parentFile, file.nameWithoutExtension + ".before-edit-" + UUID.randomUUID() + ".zip")
             original.copyTo(backup)
             check(MessageDigest.isEqual(hash(backup), oldHash)) { "CHECKSUM" }
+            lastBackupPath = backup.path
             val staged = File.createTempFile(".melkit-edit-", ".tmp", file.parentFile)
             try {
                 edited.inputStream().use { input -> java.io.FileOutputStream(staged).use { output ->
@@ -68,51 +81,74 @@ internal class BundleDocumentWriter(private val context: Context) {
                 return Uri.fromFile(target)
             } finally { staged.delete() }
         }
-        val folderTree = tree ?: throw IOException("BUNDLE_FOLDER_REQUIRED")
-        check(source.authority == folderTree.authority) { "BUNDLE_FOLDER_REQUIRED" }
-        val parent = DocumentsContract.buildDocumentUriUsingTree(folderTree, DocumentsContract.getTreeDocumentId(folderTree))
-        val children = DocumentsContract.buildChildDocumentsUriUsingTree(folderTree, DocumentsContract.getTreeDocumentId(folderTree))
-        val sourceId = DocumentsContract.getDocumentId(source)
-        val siblings: List<Pair<String, String>> = resolver.query(children, arrayOf(Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
-            buildList<Pair<String, String>> {
-                while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
-            }
-        } ?: throw IOException("BUNDLE_FOLDER_REQUIRED")
-        check(siblings.any { it.first == sourceId }) { "BUNDLE_FOLDER_REQUIRED" }
-        check(siblings.none { it.first != sourceId && it.second.equals(name, true) }) { "DUPLICATE_NAME" }
-        val scopedSource = DocumentsContract.buildDocumentUriUsingTree(folderTree, sourceId)
-        val originalName = siblings.first { it.first == sourceId }.second
-        val marker = UUID.randomUUID().toString()
-        var staged: Uri? = DocumentsContract.createDocument(resolver, parent, "application/zip", "MelKit-edit-$marker.zip")
-            ?: throw IOException("SAVE_FAILED")
-        var backup: Uri? = null
-        var published: Uri? = null
+        ContentBundle.verify(original)
+        // Single-document grants are sufficient; no parent lookup or OpenDocumentTree is needed.
+        val backup = try { backupOriginal(original) }
+        catch (error: Exception) { throw IOException("BUNDLE_BACKUP_FAILED", error) }
+        lastBackupPath = backup.path
+        VerifiedBundleOverwrite.replace(original, edited, { backup.open() }, object : VerifiedBundleOverwrite.Target {
+            override fun open() = resolver.openInputStream(source) ?: throw IOException("SOURCE_ACCESS")
+            override fun overwrite(): java.io.OutputStream = overwriteStream(source)
+        })
+        // Keep the original URI and filename. A different destination/name uses Save as new.
+        return source
+    }
+
+    private fun overwriteStream(uri: Uri): java.io.OutputStream {
+        val descriptor = resolver.openFileDescriptor(uri, "rw") ?: throw IOException("BUNDLE_READ_ONLY")
+        val output = ParcelFileDescriptor.AutoCloseOutputStream(descriptor)
         try {
-            resolver.openOutputStream(requireNotNull(staged), "wt")?.use { output ->
-                edited.inputStream().use { ContentBundle.copy(it, output, ContentBundle.MAX_ARCHIVE, null) }
-            } ?: throw IOException("SAVE_FAILED")
-            check(MessageDigest.isEqual(hash(edited), digest(requireNotNull(staged)))) { "CHECKSUM" }
-            check(MessageDigest.isEqual(oldHash, digest(source))) { "FILE_CHANGED" }
-            // Record before moving either document. The old ZIP is never deleted, even on success.
-            check(recovery.edit().putString(marker, scopedSource.toString() + "\n" + staged + "\n" + originalName).commit())
-            backup = DocumentsContract.renameDocument(resolver, scopedSource, "MelKit-before-edit-$marker.zip")
-                ?: throw IOException("BUNDLE_READ_ONLY")
-            check(recovery.edit().putString(marker, backup.toString() + "\n" + staged + "\n" + originalName).commit())
-            published = DocumentsContract.renameDocument(resolver, requireNotNull(staged), name) ?: throw IOException("SAVE_FAILED")
-            staged = null
-            check(MessageDigest.isEqual(hash(edited), digest(requireNotNull(published)))) { "CHECKSUM" }
-            recovery.edit().remove(marker).commit()
-            return requireNotNull(published)
-        } catch (error: Exception) {
-            // Keep both versions if a provider cannot roll back; the durable original remains discoverable.
-            if (backup != null) runCatching {
-                if (published != null) DocumentsContract.renameDocument(resolver, requireNotNull(published), "MelKit-uncommitted-$marker.zip")
-                DocumentsContract.renameDocument(resolver, requireNotNull(backup), originalName)
+            output.channel.truncate(0L)
+            output.channel.position(0L)
+        } catch (error: Exception) { output.close(); throw error }
+        return object : java.io.FilterOutputStream(output) {
+            override fun write(bytes: ByteArray, offset: Int, length: Int) { out.write(bytes, offset, length) }
+            override fun close() {
+                try { flush(); output.fd.sync() } finally { super.close() }
             }
-            throw error
-        } finally {
-            staged?.let { runCatching { DocumentsContract.deleteDocument(resolver, it) } }
         }
+    }
+
+    private data class Backup(val path: String, val open: () -> java.io.InputStream)
+
+    @Suppress("DEPRECATION")
+    private fun backupOriginal(original: File): Backup {
+        val name = "MelKit-before-edit-" + UUID.randomUUID() + ".zip"
+        val directory = Environment.DIRECTORY_DOWNLOADS + "/MelKit/BundleBackups/"
+        val expected = hash(original)
+        if (Build.VERSION.SDK_INT >= 29) {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/zip")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, directory)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw IOException("BUNDLE_BACKUP_FAILED")
+            var published = false
+            try {
+                original.inputStream().use { input -> overwriteStream(uri).use { output ->
+                    ContentBundle.copy(input, output, ContentBundle.MAX_ARCHIVE, null)
+                } }
+                check(MessageDigest.isEqual(expected, digest(uri))) { "CHECKSUM" }
+                val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+                check(resolver.update(uri, ready, null, null) == 1) { "BUNDLE_BACKUP_FAILED" }
+                check(MessageDigest.isEqual(expected, digest(uri))) { "CHECKSUM" }
+                published = true
+                return Backup(directory + name) { resolver.openInputStream(uri) ?: throw IOException("SOURCE_ACCESS") }
+            } finally {
+                // This is only a newly created pending copy; never delete a published backup or source.
+                if (!published) runCatching { resolver.delete(uri, null, null) }
+            }
+        }
+        val folder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MelKit/BundleBackups")
+        check(folder.isDirectory || folder.mkdirs()) { "BUNDLE_BACKUP_FAILED" }
+        val file = File(folder, name)
+        check(file.createNewFile()) { "BUNDLE_BACKUP_FAILED" }
+        original.inputStream().use { input -> java.io.FileOutputStream(file).use { output ->
+            ContentBundle.copy(input, output, ContentBundle.MAX_ARCHIVE, null); output.fd.sync()
+        } }
+        check(MessageDigest.isEqual(expected, hash(file))) { "CHECKSUM" }
+        return Backup(file.path) { file.inputStream() }
     }
 
     companion object {

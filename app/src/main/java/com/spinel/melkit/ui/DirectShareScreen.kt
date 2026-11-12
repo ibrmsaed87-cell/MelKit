@@ -59,7 +59,6 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val transfer by model.transfer.collectAsState()
     val bundleMode = bundles || pageState.editing
     var discardDraft by remember { mutableStateOf(false) }
-    var chooseEditFolder by remember { mutableStateOf(false) }
     val savedBundles by model.savedBundles.collectAsState()
     var bulkSavePending by remember { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(if (bundles) "bundle_menu" else "menu") }
@@ -77,7 +76,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     val openFolderLabel = stringResource(R.string.open_saved_folder)
     val issueMessage = pageState.issue?.let { stringResource(shareErrorText(it, bundles || page == "contents")) }
     val importedMessage = stringResource(R.string.share_imported)
-    val bundleSavedMessage = stringResource(R.string.bundle_saved)
+    val bundleSavedMessage = stringResource(if (pageState.bundleStatus == "updated") R.string.bundle_changes_saved else R.string.bundle_saved)
     LaunchedEffect(pageState.savedPath, pageState.issue, pageState.imported, pageState.bundleStatus) {
         val path = pageState.savedPath
         when {
@@ -89,7 +88,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
             issueMessage != null -> snackbar.showSnackbar(issueMessage, withDismissAction = true,
                 duration = SnackbarDuration.Long)
             pageState.imported -> snackbar.showSnackbar(importedMessage)
-            pageState.bundleStatus == "saved" -> snackbar.showSnackbar(bundleSavedMessage)
+            pageState.bundleStatus in listOf("saved", "updated") -> snackbar.showSnackbar(bundleSavedMessage)
         }
     }
     val prompt = stringResource(R.string.share_scan_prompt)
@@ -144,9 +143,6 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     }
     val bundleSource = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(model::importBundle)
-    }
-    val editFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) model.saveEditedBundle(uri) else model.issue("CANCELLED")
     }
     val readStorage = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
         if (allowed) saved.refresh() else model.issue("STORAGE_PERMISSION")
@@ -253,7 +249,10 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                 if ((pageState.busy && batch == null) || (screen == "pick" && source == "game" && connection.busy)) {
                     item { CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp) }
                 }
-                pageState.issue?.let { error -> item { ShareError(error, bundles || screen == "contents") } }
+                pageState.issue?.let { error -> item {
+                    ShareError(error, bundles || screen == "contents")
+                    pageState.bundleBackupPath?.takeIf { error.startsWith("BUNDLE_") }?.let { path -> Text(stringResource(R.string.bundle_original_backup, path)) }
+                } }
 
                 when (screen) {
                     "bundle_menu" -> {
@@ -311,8 +310,7 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                                     FilledTonalButton(modifier = Modifier.fillMaxWidth(),
                                         enabled = !pageState.busy && pageState.sourceWritable && pageState.queue.isNotEmpty() &&
                                             pageState.draftName.isNotBlank(), onClick = {
-                                            if (model.canReplaceWithoutFolder()) model.saveEditedBundle()
-                                            else chooseEditFolder = true
+                                            model.saveEditedBundle()
                                         }) { Text(stringResource(R.string.bundle_save_changes)) }
                                 }
                                 FilledTonalButton(modifier = Modifier.fillMaxWidth(),
@@ -335,8 +333,8 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
                         }
                     }
                     "bundle_ready" -> {
-                        if (pageState.bundleStatus == "saved" && pageState.issue == null) item {
-                            ShareNotice(stringResource(R.string.bundle_saved))
+                        if (pageState.bundleStatus in listOf("saved", "updated") && pageState.issue == null) item {
+                            ShareNotice(stringResource(if (pageState.bundleStatus == "updated") R.string.bundle_changes_saved else R.string.bundle_saved))
                         }
                         item {
                             ShareCard(null, null) {
@@ -724,11 +722,6 @@ internal fun DirectShareScreen(model: ShareViewModel, library: GameLibraryViewMo
     if (bundleMode && editingCover) {
         CoverEditor(pageState.draftCover, save = { model.setBundleCover(it); true }) { editingCover = false }
     }
-    if (chooseEditFolder) AlertDialog(onDismissRequest = { chooseEditFolder = false },
-        title = { Text(stringResource(R.string.bundle_save_changes)) },
-        text = { Text(stringResource(R.string.bundle_choose_parent)) },
-        confirmButton = { TextButton(onClick = { chooseEditFolder = false; editFolder.launch(null) }) { Text(stringResource(R.string.vault_closed_continue)) } },
-        dismissButton = { TextButton(onClick = { chooseEditFolder = false }) { Text(stringResource(R.string.saved_cancel)) } })
     if (discardDraft) AlertDialog(onDismissRequest = { discardDraft = false },
         title = { Text(stringResource(R.string.bundle_discard_title)) }, text = { Text(stringResource(R.string.bundle_discard_body)) },
         confirmButton = { TextButton(onClick = { discardDraft = false; model.closeBundleSession(); page = entryPage }) { Text(stringResource(R.string.bundle_discard)) } },
@@ -856,7 +849,9 @@ private fun ShareError(code: String, bundles: Boolean = false) {
 internal fun shareErrorText(code: String, bundles: Boolean): Int {
     return when (code) {
         "BUNDLE_READ_ONLY", "BUNDLE_SAVE_NEW_REQUIRED" -> R.string.bundle_read_only
-        "BUNDLE_FOLDER_REQUIRED" -> R.string.bundle_choose_parent
+        "BUNDLE_FOLDER_REQUIRED", "BUNDLE_BACKUP_FAILED" -> R.string.bundle_backup_failed
+        "BUNDLE_UPDATE_RESTORED" -> R.string.bundle_update_restored
+        "BUNDLE_RECOVERY_REQUIRED" -> R.string.bundle_recovery_required
         "CANCELLED" -> R.string.share_cancelled
         "BUNDLE_UNAVAILABLE" -> R.string.bundle_unavailable
         "CATALOG_FAILED" -> R.string.bundle_catalog_error

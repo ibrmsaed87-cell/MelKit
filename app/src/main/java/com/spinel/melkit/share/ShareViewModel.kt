@@ -54,7 +54,8 @@ internal data class SharePage(val queue: List<ShareInput> = emptyList(), val rec
     val preflight: Map<String, String> = emptyMap(), val contentWarnings: Map<String, String> = emptyMap(),
     val duplicateContent: Map<String, String> = emptyMap(), val exportResults: Map<String, String> = emptyMap(),
     val openedUri: Uri? = null, val openedName: String = "", val editorId: String? = null,
-    val editing: Boolean = false, val dirty: Boolean = false, val sourceWritable: Boolean = false)
+    val editing: Boolean = false, val dirty: Boolean = false, val sourceWritable: Boolean = false,
+    val bundleBackupPath: String? = null)
 
 internal class ShareViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application
@@ -66,7 +67,6 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
     private val documentWriter = BundleDocumentWriter(application)
     private var editorDirectory: File? = null
     private var editorOriginal: File? = null
-    fun canReplaceWithoutFolder() = state.value.openedUri?.scheme == "file"
     fun editOpenedBundle() { state.value.openedUri?.let { editBundle(it, state.value.openedName) } }
     fun editSavedBundle(item: SavedBundle) = editBundle(item.uri, item.name)
     private fun editBundle(uri: Uri, name: String) = run {
@@ -95,18 +95,18 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         val writable = withContext(Dispatchers.IO) { documentWriter.writable(uri) }
         mutableState.update { it.copy(queue = draft.third, openedUri = uri, openedName = name,
             draftName = name.removeSuffix(".zip"), draftCover = cover, bundleUri = null,
-            editorId = UUID.randomUUID().toString(), editing = true, dirty = false, sourceWritable = writable) }
+            editorId = UUID.randomUUID().toString(), editing = true, dirty = false, sourceWritable = writable, bundleBackupPath = null) }
     }
-    fun saveEditedBundle(tree: Uri? = null) = run {
+    fun saveEditedBundle() = run {
         val page = state.value
         val original = editorOriginal ?: throw IOException("SOURCE_ACCESS")
         val source = page.openedUri ?: throw IOException("SOURCE_ACCESS")
         val name = page.draftName.trim().removeSuffix(".zip") + ".zip"
         val result = runInterruptible(Dispatchers.IO) {
-            tree?.let { catalog.retain(it) }
             withBundleArchive { archive ->
                 writeDraft(archive, page.queue, page.draftCover)
-                val uri = documentWriter.replace(source, original, archive, name, tree)
+                val uri = try { documentWriter.replace(source, original, archive, name) }
+                finally { mutableState.update { it.copy(bundleBackupPath = documentWriter.lastBackupPath) } }
                 // Refresh the snapshot only after replacement is verified.
                 archive.copyTo(original, overwrite = true)
                 mutableState.update { it.copy(openedUri = uri) }
@@ -118,7 +118,7 @@ internal class ShareViewModel(application: Application) : AndroidViewModel(appli
         }
         mutableState.update { it.copy(openedUri = result.first, openedName = result.second, dirty = false) }
         AdManager.get(context).afterTask(AdPlacement.BUNDLE) {
-            mutableState.update { it.copy(bundleUri = result.first, bundleName = result.second, bundleStatus = "saved") }
+            mutableState.update { it.copy(bundleUri = result.first, bundleName = result.second, bundleStatus = "updated") }
         }
     }
     private fun writeDraft(archive: File, queue: List<ShareInput>, cover: Bitmap?) {

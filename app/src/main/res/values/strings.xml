@@ -445,6 +445,11 @@
     <string name="bundle_discard_body">Discard these edits and leave the editor? The original bundle and game files are preserved.</string>
     <string name="bundle_discard">Discard edits</string>
     <string name="bundle_keep_editing">Keep editing</string>
+    <string name="bundle_changes_saved">Changes saved to the original bundle.</string>
+    <string name="bundle_original_backup">Original backup: %1$s</string>
+    <string name="bundle_backup_failed">Could not verify a safety backup. The original bundle was not changed. You can save as a new bundle.</string>
+    <string name="bundle_update_restored">Could not save changes. The original bundle is intact or was restored. Your edits are still available; try saving as a new bundle.</string>
+    <string name="bundle_recovery_required">The file provider stopped responding before recovery finished. Your original ZIP is safe in the backup shown below. Keep it and save your edits as a new bundle.</string>
 </resources>
 
 
